@@ -13,21 +13,22 @@ const db = firebase.database();
 
 let chart;
 let history = [];
+let lastSavedKey = null;
 
-let lastSavedTime = null; // 🔥 prevent duplicate history
-
-// ================= RESTORE PAGE STATE =================
+// ================= RESTORE PAGE =================
 window.onload = function () {
   const savedPage = localStorage.getItem("page") || "live";
 
-  if (savedPage === "history-temp") showTemp();
-  else if (savedPage === "history-hum") showHum();
-  else showLive();
-
   initChart();
+
+  loadHistory(() => {
+    if (savedPage === "history-temp") showTemp();
+    else if (savedPage === "history-hum") showHum();
+    else showLive();
+  });
 };
 
-// ================= INIT CHART =================
+// ================= CHART =================
 function initChart() {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -51,15 +52,13 @@ db.ref("/room").on("value", (snap) => {
   const hum = d?.humidity;
   const status = d?.status;
 
-  // ================= DISCONNECTED LOGIC =================
-  const isDisconnected =
-    temp === undefined || hum === undefined ||
-    temp === null || hum === null ||
+  const disconnected =
+    temp == null || hum == null ||
     isNaN(temp) || isNaN(hum);
 
-  const tempUI = isDisconnected ? "DISCONNECTED" : temp;
-  const humUI = isDisconnected ? "DISCONNECTED" : hum;
-  const statusUI = isDisconnected ? "DISCONNECTED" : status;
+  const tempUI = disconnected ? "DISCONNECTED" : temp;
+  const humUI = disconnected ? "DISCONNECTED" : hum;
+  const statusUI = disconnected ? "DISCONNECTED" : status;
 
   document.getElementById("temp").innerText = tempUI;
   document.getElementById("hum").innerText = humUI;
@@ -67,24 +66,24 @@ db.ref("/room").on("value", (snap) => {
 
   const alertBox = document.getElementById("alert");
 
-  if (isDisconnected) {
+  // ================= DISCONNECTED =================
+  if (disconnected) {
     alertBox.innerText = "⚠ SENSOR DISCONNECTED";
     alertBox.style.background = "gray";
     alertBox.style.color = "white";
-    return;
+    return; // safe return
   }
 
   // ================= TIME =================
   const now = new Date();
   const date = now.toISOString().split("T")[0];
   const time = now.toTimeString().split(" ")[0];
+  const key = date + time;
 
-  const uniqueKey = date + time;
-
-  // 🔥 SAVE ONLY IF NEW ENTRY
-  if (lastSavedTime !== uniqueKey) {
+  // ================= SAVE HISTORY (NO DUPLICATES) =================
+  if (lastSavedKey !== key) {
     db.ref("/history").push({ date, time, temp, hum });
-    lastSavedTime = uniqueKey;
+    lastSavedKey = key;
   }
 
   // ================= CHART =================
@@ -117,7 +116,11 @@ db.ref("/room").on("value", (snap) => {
 function loadHistory(callback) {
   db.ref("/history").once("value", (snap) => {
     history = [];
-    snap.forEach(child => history.push(child.val()));
+
+    snap.forEach(child => {
+      history.push(child.val());
+    });
+
     history.reverse();
     callback();
   });
@@ -158,7 +161,7 @@ function render(title, type) {
       <tr>
         <th>Date</th>
         <th>Time</th>
-        <th>${type === "temp" ? "Temperature" : "Humidity"}</th>
+        <th>Value</th>
       </tr>
   `;
 
@@ -176,7 +179,7 @@ function render(title, type) {
   document.getElementById("list").innerHTML = html;
 }
 
-// ================= SEARCH =================
+// ================= FILTER =================
 function filterHistory() {
   const date = document.getElementById("searchDate").value;
   const time = document.getElementById("searchTime").value;
@@ -204,7 +207,7 @@ function renderFiltered(data) {
       <tr>
         <td>${h.date}</td>
         <td>${h.time}</td>
-        <td>${h.temp || h.hum}</td>
+        <td>${h.temp ?? h.hum}</td>
       </tr>
     `;
   });
