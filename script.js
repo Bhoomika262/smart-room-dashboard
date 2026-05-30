@@ -13,23 +13,11 @@ const db = firebase.database();
 
 let chart;
 let history = [];
-let lastSavedKey = null;
 
-// ================= RESTORE PAGE =================
+let lastTimestamp = 0;
+
+// ================= INIT =================
 window.onload = function () {
-  const savedPage = localStorage.getItem("page") || "live";
-
-  initChart();
-
-  loadHistory(() => {
-    if (savedPage === "history-temp") showTemp();
-    else if (savedPage === "history-hum") showHum();
-    else showLive();
-  });
-};
-
-// ================= CHART =================
-function initChart() {
   const ctx = document.getElementById("chart").getContext("2d");
 
   chart = new Chart(ctx, {
@@ -42,7 +30,7 @@ function initChart() {
       ]
     }
   });
-}
+};
 
 // ================= LIVE DATA =================
 db.ref("/room").on("value", (snap) => {
@@ -50,41 +38,49 @@ db.ref("/room").on("value", (snap) => {
 
   const temp = d?.temperature;
   const hum = d?.humidity;
-  const status = d?.status;
 
-  const disconnected =
-    temp == null || hum == null ||
-    isNaN(temp) || isNaN(hum);
+  const now = Date.now();
 
-  const tempUI = disconnected ? "DISCONNECTED" : temp;
-  const humUI = disconnected ? "DISCONNECTED" : hum;
-  const statusUI = disconnected ? "DISCONNECTED" : status;
+  // 🔥 HEARTBEAT: if no data recently → disconnected
+  const isDisconnected =
+    temp === undefined ||
+    hum === undefined ||
+    temp === null ||
+    hum === null ||
+    isNaN(temp) ||
+    isNaN(hum) ||
+    (now - lastTimestamp > 15000); // 15 sec rule
+
+  const tempUI = isDisconnected ? "DISCONNECTED" : temp;
+  const humUI = isDisconnected ? "DISCONNECTED" : hum;
 
   document.getElementById("temp").innerText = tempUI;
   document.getElementById("hum").innerText = humUI;
-  document.getElementById("status").innerText = statusUI;
 
   const alertBox = document.getElementById("alert");
 
-  // ================= DISCONNECTED =================
-  if (disconnected) {
+  if (isDisconnected) {
     alertBox.innerText = "⚠ SENSOR DISCONNECTED";
     alertBox.style.background = "gray";
     alertBox.style.color = "white";
-    return; // safe return
+    return;
   }
 
-  // ================= TIME =================
-  const now = new Date();
-  const date = now.toISOString().split("T")[0];
-  const time = now.toTimeString().split(" ")[0];
-  const key = date + time;
+  // ================= UPDATE TIMESTAMP =================
+  lastTimestamp = now;
 
-  // ================= SAVE HISTORY (NO DUPLICATES) =================
-  if (lastSavedKey !== key) {
-    db.ref("/history").push({ date, time, temp, hum });
-    lastSavedKey = key;
-  }
+  const dateObj = new Date();
+  const date = dateObj.toISOString().split("T")[0];
+  const time = dateObj.toTimeString().split(" ")[0];
+
+  // ================= SAVE HISTORY (WITH STATUS) =================
+  db.ref("/history").push({
+    date,
+    time,
+    temp,
+    hum,
+    status: "OK"
+  });
 
   // ================= CHART =================
   chart.data.labels.push(time);
@@ -113,44 +109,36 @@ db.ref("/room").on("value", (snap) => {
 });
 
 // ================= LOAD HISTORY =================
-function loadHistory(callback) {
+function loadHistory(cb) {
   db.ref("/history").once("value", (snap) => {
     history = [];
-
-    snap.forEach(child => {
-      history.push(child.val());
-    });
-
+    snap.forEach(c => history.push(c.val()));
     history.reverse();
-    callback();
+    cb();
   });
 }
 
 // ================= MENU =================
 function toggleMenu() {
   const menu = document.getElementById("menu");
-  menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
+  menu.style.right = menu.style.right === "0px" ? "-260px" : "0px";
 }
 
-// ================= PAGE CONTROL =================
 function showLive() {
-  localStorage.setItem("page", "live");
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
+// ================= HISTORY =================
 function showTemp() {
-  localStorage.setItem("page", "history-temp");
-  loadHistory(() => render("Temperature History", "temp"));
+  loadHistory(() => renderTable("Temperature History", "temp"));
 }
 
 function showHum() {
-  localStorage.setItem("page", "history-hum");
-  loadHistory(() => render("Humidity History", "hum"));
+  loadHistory(() => renderTable("Humidity History", "hum"));
 }
 
-// ================= TABLE =================
-function render(title, type) {
+function renderTable(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
 
@@ -161,7 +149,8 @@ function render(title, type) {
       <tr>
         <th>Date</th>
         <th>Time</th>
-        <th>Value</th>
+        <th>${type === "temp" ? "Temperature" : "Humidity"}</th>
+        <th>Status</th>
       </tr>
   `;
 
@@ -170,7 +159,8 @@ function render(title, type) {
       <tr>
         <td>${h.date}</td>
         <td>${h.time}</td>
-        <td>${type === "temp" ? h.temp : h.hum}</td>
+        <td>${h.temp ?? "DISCONNECTED"}</td>
+        <td>${h.status ?? "DISCONNECTED"}</td>
       </tr>
     `;
   });
@@ -179,7 +169,7 @@ function render(title, type) {
   document.getElementById("list").innerHTML = html;
 }
 
-// ================= FILTER =================
+// ================= SEARCH =================
 function filterHistory() {
   const date = document.getElementById("searchDate").value;
   const time = document.getElementById("searchTime").value;
@@ -199,6 +189,7 @@ function renderFiltered(data) {
         <th>Date</th>
         <th>Time</th>
         <th>Value</th>
+        <th>Status</th>
       </tr>
   `;
 
@@ -207,7 +198,8 @@ function renderFiltered(data) {
       <tr>
         <td>${h.date}</td>
         <td>${h.time}</td>
-        <td>${h.temp ?? h.hum}</td>
+        <td>${h.temp ?? h.hum ?? "DISCONNECTED"}</td>
+        <td>${h.status ?? "DISCONNECTED"}</td>
       </tr>
     `;
   });
