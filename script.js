@@ -13,9 +13,8 @@ const db = firebase.database();
 
 let chart;
 let history = [];
-let lastUpdateTime = Date.now(); // 🔥 NEW
+let lastUpdate = Date.now(); // ⭐ IMPORTANT
 
-// INIT CHART
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -30,16 +29,16 @@ window.onload = function () {
     }
   });
 
-  // 🔥 check disconnect every 3 sec
-  setInterval(checkConnection, 3000);
+  // 🔥 check every 3 sec
+  setInterval(checkOffline, 3000);
 };
 
-// 🔥 LIVE DATA
+// ================= LIVE DATA =================
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
 
-  lastUpdateTime = Date.now(); // update time
+  lastUpdate = Date.now(); // reset timer
 
   const temp = d.temperature;
   const hum = d.humidity;
@@ -49,16 +48,13 @@ db.ref("/room").on("value", (snap) => {
   document.getElementById("hum").innerText = hum;
   document.getElementById("status").innerText = status;
 
+  updateAlert(temp);
+
   const now = new Date();
   const date = now.toISOString().split("T")[0];
   const time = now.toTimeString().split(" ")[0];
 
-  db.ref("/history").push({
-    date,
-    time,
-    temp,
-    hum
-  });
+  history.unshift({ date, time, temp, hum });
 
   chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
@@ -71,16 +67,13 @@ db.ref("/room").on("value", (snap) => {
   }
 
   chart.update();
-
-  updateAlert(temp);
 });
 
-// 🔥 CONNECTION CHECK (NEW FEATURE)
-function checkConnection() {
+// ================= OFFLINE CHECK =================
+function checkOffline() {
   const now = Date.now();
-  const diff = now - lastUpdateTime;
 
-  if (diff > 8000) { // 8 sec no data
+  if (now - lastUpdate > 8000) { // 8 sec no data
     document.getElementById("temp").innerText = "DISCONNECTED";
     document.getElementById("hum").innerText = "DISCONNECTED";
     document.getElementById("status").innerText = "OFFLINE";
@@ -92,18 +85,18 @@ function checkConnection() {
   }
 }
 
-// 🔥 ALERT
+// ================= ALERT =================
 function updateAlert(temp) {
   const alertBox = document.getElementById("alert");
 
   if (temp > 35) {
     alertBox.innerText = "🔥 HOT";
     alertBox.style.background = "red";
-  }
+  } 
   else if (temp < 15) {
     alertBox.innerText = "❄ COLD";
     alertBox.style.background = "blue";
-  }
+  } 
   else {
     alertBox.innerText = "✅ NORMAL";
     alertBox.style.background = "green";
@@ -112,17 +105,7 @@ function updateAlert(temp) {
   alertBox.style.color = "white";
 }
 
-/* ================= HISTORY (UNCHANGED) ================= */
-
-function loadHistory(callback) {
-  db.ref("/history").once("value", (snap) => {
-    history = [];
-    snap.forEach(child => history.push(child.val()));
-    history.reverse();
-    callback();
-  });
-}
-
+// ================= MENU =================
 function toggleMenu() {
   const menu = document.getElementById("menu");
   menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
@@ -134,31 +117,23 @@ function showLive() {
 }
 
 function showTemp() {
-  loadHistory(() => render("Temperature History", "temp"));
+  render("temp");
 }
 
 function showHum() {
-  loadHistory(() => render("Humidity History", "hum"));
+  render("hum");
 }
 
-function render(title, type) {
+function render(type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
-  document.getElementById("title").innerText = title;
-  buildTable(history, type);
-}
 
-function buildTable(data, type) {
-  let html = `
-    <table>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>${type === "temp" ? "Temp (°C)" : "Humidity (%)"}</th>
-      </tr>
-  `;
+  document.getElementById("title").innerText =
+    type === "temp" ? "Temperature History" : "Humidity History";
 
-  data.forEach(h => {
+  let html = "<table><tr><th>Date</th><th>Time</th><th>Value</th></tr>";
+
+  history.forEach(h => {
     html += `
       <tr>
         <td>${h.date}</td>
@@ -168,7 +143,8 @@ function buildTable(data, type) {
     `;
   });
 
-  html += `</table>`;
+  html += "</table>";
+
   document.getElementById("list").innerHTML = html;
 }
 
