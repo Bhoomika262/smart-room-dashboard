@@ -18,7 +18,6 @@
       justify-content:space-between;
       padding:12px;
       background:white;
-      box-shadow:0 2px 8px rgba(0,0,0,0.1);
       position:sticky;
       top:0;
     }
@@ -41,12 +40,6 @@
       transition:0.3s;
     }
 
-    .side-menu button {
-      width:100%;
-      padding:10px;
-      margin-top:10px;
-    }
-
     .container {
       max-width:900px;
       margin:auto;
@@ -54,37 +47,19 @@
       text-align:center;
     }
 
-    .grid {
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:15px;
-    }
-
-    .card {
-      background:white;
-      padding:20px;
-      border-radius:10px;
-    }
-
-    .dark .card { background:#1e1e1e; }
-
     table {
       width:100%;
       border-collapse:collapse;
-      margin-top:15px;
     }
 
-    th,td {
+    th, td {
       border:1px solid #ccc;
       padding:8px;
-      text-align:center;
     }
 
-    th { background:#333; color:white; }
-
-    .search-box input {
-      padding:8px;
-      margin:5px;
+    th {
+      background:#333;
+      color:white;
     }
   </style>
 </head>
@@ -97,9 +72,8 @@
 </div>
 
 <div id="menu" class="side-menu">
-  <h3>Menu</h3>
-  <button onclick="showLive()">Live</button>
-  <button onclick="showHistory()">History</button>
+  <button onclick="setPage('live')">Live</button>
+  <button onclick="setPage('history')">History</button>
   <button onclick="toggleDark()">Dark</button>
 </div>
 
@@ -108,40 +82,14 @@
   <!-- LIVE -->
   <div id="live">
     <h2>Live Data</h2>
-
-    <div class="grid">
-      <div class="card">
-        <h3>Temp</h3>
-        <div id="temp">--</div>
-      </div>
-
-      <div class="card">
-        <h3>Humidity</h3>
-        <div id="hum">--</div>
-      </div>
-
-      <div class="card">
-        <h3>Status</h3>
-        <div id="status">--</div>
-      </div>
-    </div>
-
-    <div id="alert">System Normal</div>
-
-    <canvas id="chart"></canvas>
+    <h3 id="temp">--</h3>
+    <h3 id="hum">--</h3>
+    <h3 id="status">--</h3>
   </div>
 
   <!-- HISTORY -->
   <div id="history" style="display:none;">
     <h2>History</h2>
-
-    <div class="search-box">
-      <input type="date" id="dateFilter">
-      <input type="time" id="timeFilter">
-      <button onclick="filter()">Search</button>
-      <button onclick="reset()">Reset</button>
-    </div>
-
     <div id="table"></div>
   </div>
 
@@ -149,7 +97,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script src="script.js"></script>
 

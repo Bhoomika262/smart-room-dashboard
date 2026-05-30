@@ -11,25 +11,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let chart;
 let history = [];
 
-/* ================= PAGE RESTORE ================= */
+/* ================= VERY IMPORTANT FIX ================= */
 window.onload = function () {
 
-  const page = localStorage.getItem("page") || "live";
-  if (page === "history") showHistory();
+  const savedPage = localStorage.getItem("page");
 
-  chart = new Chart(document.getElementById("chart"), {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        { label: "Temp", data: [], borderColor: "red" },
-        { label: "Hum", data: [], borderColor: "blue" }
-      ]
-    }
-  });
+  // DEFAULT = live
+  if (savedPage === "history") {
+    showHistory(true);
+  } else {
+    showLive(true);
+  }
 
   loadHistory();
 };
@@ -39,38 +33,23 @@ db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
 
-  const temp = d.temperature;
-  const hum = d.humidity;
-  const status = d.status;
-
-  document.getElementById("temp").innerText = temp;
-  document.getElementById("hum").innerText = hum;
-  document.getElementById("status").innerText = status;
+  document.getElementById("temp").innerText = d.temperature;
+  document.getElementById("hum").innerText = d.humidity;
+  document.getElementById("status").innerText = d.status;
 
   const now = new Date();
   const date = now.toISOString().split("T")[0];
   const time = now.toTimeString().split(" ")[0];
 
-  // ONLY SAVE IF NEW DATA (PREVENT SPAM)
-  db.ref("/history").push({ date, time, temp, hum });
-
-  chart.data.labels.push(time);
-  chart.data.datasets[0].data.push(temp);
-  chart.data.datasets[1].data.push(hum);
-
-  if (chart.data.labels.length > 10) {
-    chart.data.labels.shift();
-    chart.data.datasets[0].data.shift();
-    chart.data.datasets[1].data.shift();
-  }
-
-  chart.update();
-
-  document.getElementById("alert").innerText =
-    temp > 35 ? "HOT" : temp < 15 ? "COLD" : "NORMAL";
+  db.ref("/history").push({
+    date,
+    time,
+    temp: d.temperature,
+    hum: d.humidity
+  });
 });
 
-/* ================= LOAD HISTORY FROM FIREBASE ================= */
+/* ================= LOAD HISTORY ================= */
 function loadHistory() {
   db.ref("/history").on("value", (snap) => {
     history = [];
@@ -80,31 +59,40 @@ function loadHistory() {
     });
 
     history.reverse();
+
+    // auto refresh table if history page open
+    if (localStorage.getItem("page") === "history") {
+      render();
+    }
   });
 }
 
-/* ================= MENU ================= */
-function toggleMenu() {
-  const m = document.getElementById("menu");
-  m.style.right = (m.style.right === "0px") ? "-250px" : "0px";
+/* ================= PAGE SYSTEM (FIXED) ================= */
+function setPage(page) {
+  localStorage.setItem("page", page);
+
+  if (page === "history") showHistory();
+  else showLive();
 }
 
-/* ================= PAGE CONTROL ================= */
-function showLive() {
-  localStorage.setItem("page", "live");
+function showLive(skipSave) {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
+
+  if (!skipSave) localStorage.setItem("page", "live");
 }
 
-function showHistory() {
-  localStorage.setItem("page", "history");
+function showHistory(skipSave) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
-  render(history);
+
+  if (!skipSave) localStorage.setItem("page", "history");
+
+  render();
 }
 
 /* ================= TABLE ================= */
-function render(data) {
+function render() {
   let html = `
     <table>
       <tr>
@@ -115,42 +103,29 @@ function render(data) {
       </tr>
   `;
 
-  data.forEach(d => {
+  history.forEach(h => {
     html += `
       <tr>
-        <td>${d.date}</td>
-        <td>${d.time}</td>
-        <td>${d.temp}</td>
-        <td>${d.hum}</td>
+        <td>${h.date}</td>
+        <td>${h.time}</td>
+        <td>${h.temp}</td>
+        <td>${h.hum}</td>
       </tr>
     `;
   });
 
   html += "</table>";
+
   document.getElementById("table").innerHTML = html;
 }
 
-/* ================= FILTER ================= */
-function filter() {
-  const date = document.getElementById("dateFilter").value;
-  const time = document.getElementById("timeFilter").value;
-
-  let filtered = history;
-
-  if (date) filtered = filtered.filter(x => x.date === date);
-  if (time) filtered = filtered.filter(x => x.time.startsWith(time));
-
-  render(filtered);
+/* ================= MENU ================= */
+function toggleMenu() {
+  const m = document.getElementById("menu");
+  m.style.right = (m.style.right === "0px") ? "-250px" : "0px";
 }
 
-/* ================= RESET ================= */
-function reset() {
-  document.getElementById("dateFilter").value = "";
-  document.getElementById("timeFilter").value = "";
-  render(history);
-}
-
-/* ================= DARK MODE ================= */
+/* ================= DARK ================= */
 function toggleDark() {
   document.body.classList.toggle("dark");
 }
