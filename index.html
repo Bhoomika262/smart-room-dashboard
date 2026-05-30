@@ -25,6 +25,11 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       position: sticky;
       top: 0;
+      z-index: 10;
+    }
+
+    .dark .topbar {
+      background: #1e1e1e;
     }
 
     .menu-btn {
@@ -44,6 +49,7 @@
       color: white;
       padding: 20px;
       transition: 0.3s;
+      z-index: 99;
     }
 
     .side-menu button {
@@ -51,6 +57,8 @@
       padding: 10px;
       margin-top: 10px;
       cursor: pointer;
+      border: none;
+      border-radius: 6px;
     }
 
     .container {
@@ -87,6 +95,7 @@
       padding: 12px;
       border-radius: 10px;
       font-weight: bold;
+      transition: 0.3s;
     }
 
     canvas {
@@ -94,6 +103,10 @@
       background: white;
       border-radius: 10px;
       padding: 10px;
+    }
+
+    .dark canvas {
+      background: #1e1e1e;
     }
 
     table {
@@ -113,25 +126,27 @@
       color: white;
     }
 
-    .search-box input {
-      padding: 8px;
-      margin: 5px;
+    .dark th {
+      background: #444;
     }
 
+    .search-box input,
     .search-box button {
-      padding: 8px 12px;
-      cursor: pointer;
+      padding: 8px;
+      margin: 5px;
     }
   </style>
 </head>
 
 <body>
 
+<!-- TOP BAR -->
 <div class="topbar">
   <h3>🏠 Smart Room Dashboard</h3>
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
+<!-- SIDE MENU -->
 <div id="menu" class="side-menu">
   <h3>Menu</h3>
   <button onclick="showLive()">Live</button>
@@ -140,6 +155,7 @@
   <button onclick="toggleDark()">Dark Mode</button>
 </div>
 
+<!-- MAIN -->
 <div class="container">
 
   <!-- LIVE -->
@@ -184,6 +200,7 @@
 
 </div>
 
+<!-- SCRIPTS -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
