@@ -13,9 +13,10 @@ const db = firebase.database();
 
 let chart;
 let history = [];
-let lastUpdateTime = Date.now(); // 🔥 NEW
+let lastUpdate = Date.now();
+let isOffline = false;
 
-// INIT CHART
+// ================= INIT CHART =================
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -30,16 +31,19 @@ window.onload = function () {
     }
   });
 
-  // 🔥 check disconnect every 3 sec
-  setInterval(checkConnection, 3000);
+  setInterval(checkOffline, 2000);
 };
 
-// 🔥 LIVE DATA
+// ================= LIVE DATA =================
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
 
-  lastUpdateTime = Date.now(); // update time
+  lastUpdate = Date.now();
+
+  if (isOffline) {
+    isOffline = false;
+  }
 
   const temp = d.temperature;
   const hum = d.humidity;
@@ -53,6 +57,7 @@ db.ref("/room").on("value", (snap) => {
   const date = now.toISOString().split("T")[0];
   const time = now.toTimeString().split(" ")[0];
 
+  // SAVE HISTORY TO FIREBASE (YOU ALREADY HAVE THIS)
   db.ref("/history").push({
     date,
     time,
@@ -60,6 +65,7 @@ db.ref("/room").on("value", (snap) => {
     hum
   });
 
+  // UPDATE CHART
   chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
@@ -75,12 +81,13 @@ db.ref("/room").on("value", (snap) => {
   updateAlert(temp);
 });
 
-// 🔥 CONNECTION CHECK (NEW FEATURE)
-function checkConnection() {
+// ================= SENSOR DISCONNECT CHECK =================
+function checkOffline() {
   const now = Date.now();
-  const diff = now - lastUpdateTime;
 
-  if (diff > 8000) { // 8 sec no data
+  if (now - lastUpdate > 8000 && !isOffline) {
+    isOffline = true;
+
     document.getElementById("temp").innerText = "DISCONNECTED";
     document.getElementById("hum").innerText = "DISCONNECTED";
     document.getElementById("status").innerText = "OFFLINE";
@@ -92,19 +99,19 @@ function checkConnection() {
   }
 }
 
-// 🔥 ALERT
+// ================= ALERT =================
 function updateAlert(temp) {
+  if (isOffline) return;
+
   const alertBox = document.getElementById("alert");
 
   if (temp > 35) {
     alertBox.innerText = "🔥 HOT";
     alertBox.style.background = "red";
-  }
-  else if (temp < 15) {
+  } else if (temp < 15) {
     alertBox.innerText = "❄ COLD";
     alertBox.style.background = "blue";
-  }
-  else {
+  } else {
     alertBox.innerText = "✅ NORMAL";
     alertBox.style.background = "green";
   }
@@ -112,17 +119,19 @@ function updateAlert(temp) {
   alertBox.style.color = "white";
 }
 
-/* ================= HISTORY (UNCHANGED) ================= */
-
+// ================= HISTORY LOAD =================
 function loadHistory(callback) {
   db.ref("/history").once("value", (snap) => {
     history = [];
-    snap.forEach(child => history.push(child.val()));
+    snap.forEach(child => {
+      history.push(child.val());
+    });
     history.reverse();
     callback();
   });
 }
 
+// ================= MENU =================
 function toggleMenu() {
   const menu = document.getElementById("menu");
   menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
@@ -141,24 +150,23 @@ function showHum() {
   loadHistory(() => render("Humidity History", "hum"));
 }
 
+// ================= TABLE =================
 function render(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
-  document.getElementById("title").innerText = title;
-  buildTable(history, type);
-}
 
-function buildTable(data, type) {
+  document.getElementById("title").innerText = title;
+
   let html = `
     <table>
       <tr>
         <th>Date</th>
         <th>Time</th>
-        <th>${type === "temp" ? "Temp (°C)" : "Humidity (%)"}</th>
+        <th>${type === "temp" ? "Temperature (°C)" : "Humidity (%)"}</th>
       </tr>
   `;
 
-  data.forEach(h => {
+  history.forEach(h => {
     html += `
       <tr>
         <td>${h.date}</td>
@@ -172,6 +180,50 @@ function buildTable(data, type) {
   document.getElementById("list").innerHTML = html;
 }
 
+// ================= FILTER =================
+function filterHistory() {
+  const date = document.getElementById("searchDate").value;
+  const time = document.getElementById("searchTime").value;
+
+  let filtered = history;
+
+  if (date) filtered = filtered.filter(h => h.date === date);
+  if (time) filtered = filtered.filter(h => h.time.startsWith(time));
+
+  renderFiltered(filtered);
+}
+
+function resetHistory() {
+  document.getElementById("searchDate").value = "";
+  document.getElementById("searchTime").value = "";
+  renderFiltered(history);
+}
+
+function renderFiltered(data) {
+  let html = `
+    <table>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Value</th>
+      </tr>
+  `;
+
+  data.forEach(h => {
+    html += `
+      <tr>
+        <td>${h.date}</td>
+        <td>${h.time}</td>
+        <td>${h.temp ?? h.hum}</td>
+      </tr>
+    `;
+  });
+
+  html += `</table>`;
+  document.getElementById("list").innerHTML = html;
+}
+
+// ================= DARK MODE =================
 function toggleDark() {
   document.body.classList.toggle("dark");
 }
