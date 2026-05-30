@@ -16,7 +16,6 @@
       color: white;
     }
 
-    /* TOP BAR */
     .topbar {
       display: flex;
       justify-content: space-between;
@@ -26,11 +25,6 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       position: sticky;
       top: 0;
-      z-index: 10;
-    }
-
-    .dark .topbar {
-      background: #1e1e1e;
     }
 
     .menu-btn {
@@ -40,7 +34,6 @@
       cursor: pointer;
     }
 
-    /* SIDE MENU */
     .side-menu {
       position: fixed;
       top: 0;
@@ -50,8 +43,7 @@
       background: #222;
       color: white;
       padding: 20px;
-      transition: 0.3s ease;
-      z-index: 999;
+      transition: 0.3s;
     }
 
     .side-menu button {
@@ -59,11 +51,8 @@
       padding: 10px;
       margin-top: 10px;
       cursor: pointer;
-      border: none;
-      border-radius: 6px;
     }
 
-    /* MAIN */
     .container {
       max-width: 900px;
       margin: auto;
@@ -107,11 +96,6 @@
       padding: 10px;
     }
 
-    .dark canvas {
-      background: #1e1e1e;
-    }
-
-    /* TABLE */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -129,15 +113,6 @@
       color: white;
     }
 
-    .dark th {
-      background: #444;
-    }
-
-    /* SEARCH BOX */
-    .search-box {
-      margin: 10px 0;
-    }
-
     .search-box input {
       padding: 8px;
       margin: 5px;
@@ -152,22 +127,19 @@
 
 <body>
 
-<!-- TOP BAR -->
 <div class="topbar">
   <h3>🏠 Smart Room Dashboard</h3>
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
-<!-- SIDE MENU -->
 <div id="menu" class="side-menu">
-  <h3>📂 Menu</h3>
-  <button onclick="showLive()">Live Data</button>
-  <button onclick="showTemp()">Temperature History</button>
+  <h3>Menu</h3>
+  <button onclick="showLive()">Live</button>
+  <button onclick="showTemp()">Temp History</button>
   <button onclick="showHum()">Humidity History</button>
   <button onclick="toggleDark()">Dark Mode</button>
 </div>
 
-<!-- MAIN -->
 <div class="container">
 
   <!-- LIVE -->
@@ -200,7 +172,6 @@
   <div id="history" style="display:none;">
     <h2 id="title">History</h2>
 
-    <!-- SEARCH -->
     <div class="search-box">
       <input type="date" id="searchDate">
       <input type="time" id="searchTime">
@@ -213,11 +184,8 @@
 
 </div>
 
-<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
-<!-- CHART -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script src="script.js"></script>
