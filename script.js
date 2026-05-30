@@ -1,3 +1,4 @@
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyB17WZ0At7da-f4aUajp2JRUoMJIIv94k",
   authDomain: "smart-room-100e5.firebaseapp.com",
@@ -11,10 +12,23 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// State
 let chart;
-let history = [];
-let lastUpdate = Date.now(); // ⭐ IMPORTANT
+let allHistory     = [];
+let filteredHistory= [];
+let currentView    = "temp";
 
+// Sensor alive tracking:
+// Each time the /room listener fires (any value, even same as before),
+// we stamp the browser clock. If no event for 15s => sensor disconnected.
+// We do NOT compare values. Same temp/hum still = alive.
+let lastSensorEventTime = null;
+const SENSOR_TIMEOUT    = 15000; // ms
+
+
+// ============================================================
+//  CHART INIT
+// ============================================================
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -23,129 +37,298 @@ window.onload = function () {
     data: {
       labels: [],
       datasets: [
-        { label: "Temperature", data: [], borderColor: "red", fill: false },
-        { label: "Humidity", data: [], borderColor: "blue", fill: false }
+        {
+          label: "Temperature (C)",
+          data: [],
+          borderColor: "#ef4444",
+          backgroundColor: "rgba(239,68,68,0.08)",
+          fill: true,
+          tension: 0.4,
+          pointRadius: 3
+        },
+        {
+          label: "Humidity (%)",
+          data: [],
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.08)",
+          fill: true,
+          tension: 0.4,
+          pointRadius: 3
+        }
       ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "top" } },
+      scales: {
+        x: { grid: { color: "rgba(128,128,128,0.1)" } },
+        y: { grid: { color: "rgba(128,128,128,0.1)" } }
+      }
     }
   });
 
-  // 🔥 check every 3 sec
-  setInterval(checkOffline, 3000);
+  // 1. Browser <-> Firebase connection (topbar badge)
+  db.ref(".info/connected").on("value", function(snap) {
+    setBrowserConnection(snap.val() === true);
+  });
+
+  // 2. Check sensor status every 5 seconds
+  //    Simply: has a /room event arrived recently?
+  setInterval(updateSensorStatus, 5000);
+
+  // 3. Load history from Firebase
+  loadHistoryFromFirebase();
 };
 
-// ================= LIVE DATA =================
-db.ref("/room").on("value", (snap) => {
-  const d = snap.val();
+
+// ============================================================
+//  LIVE DATA LISTENER
+//  Every time this fires = sensor is alive (regardless of values)
+// ============================================================
+db.ref("/room").on("value", function(snap) {
+  var d = snap.val();
   if (!d) return;
 
-  lastUpdate = Date.now(); // reset timer
+  // Stamp the time this event arrived in the BROWSER
+  lastSensorEventTime = Date.now();
 
-  const temp = d.temperature;
-  const hum = d.humidity;
-  const status = d.status;
+  var temp = d.temperature;
+  var hum  = d.humidity;
 
-  document.getElementById("temp").innerText = temp;
-  document.getElementById("hum").innerText = hum;
-  document.getElementById("status").innerText = status;
+  if (temp == null || hum == null) return;
 
-  updateAlert(temp);
+  document.getElementById("temp").textContent = temp + " C";
+  document.getElementById("hum").textContent  = hum + " %";
 
-  const now = new Date();
-  const date = now.toISOString().split("T")[0];
-  const time = now.toTimeString().split(" ")[0];
+  // Immediately mark connected since we just got data
+  setSensorConnected(true);
 
-  history.unshift({ date, time, temp, hum });
+  updateAlert(temp, hum);
 
+  // Chart
+  var time = new Date().toTimeString().slice(0, 8);
   chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
-
-  if (chart.data.labels.length > 10) {
+  if (chart.data.labels.length > 15) {
     chart.data.labels.shift();
     chart.data.datasets[0].data.shift();
     chart.data.datasets[1].data.shift();
   }
+  chart.update("none");
 
-  chart.update();
+  // Save to Firebase history (persistent)
+  saveToHistory(temp, hum);
 });
 
-// ================= OFFLINE CHECK =================
-function checkOffline() {
-  const now = Date.now();
 
-  if (now - lastUpdate > 8000) { // 8 sec no data
-    document.getElementById("temp").innerText = "DISCONNECTED";
-    document.getElementById("hum").innerText = "DISCONNECTED";
-    document.getElementById("status").innerText = "OFFLINE";
+// ============================================================
+//  SENSOR STATUS
+//  Called every 5 seconds AND immediately on each data event
+// ============================================================
+function updateSensorStatus() {
+  if (lastSensorEventTime === null) {
+    // No event ever received yet — still waiting
+    setSensorConnected(null);
+    return;
+  }
+  var age = Date.now() - lastSensorEventTime;
+  setSensorConnected(age < SENSOR_TIMEOUT);
+}
 
-    const alertBox = document.getElementById("alert");
-    alertBox.innerText = "⚠ SENSOR DISCONNECTED";
-    alertBox.style.background = "red";
-    alertBox.style.color = "white";
+function setSensorConnected(state) {
+  var el = document.getElementById("sensorStatus");
+  if (state === true) {
+    el.textContent   = "CONNECTED";
+    el.style.color   = "#22c55e";
+    el.style.fontSize= "0.95rem";
+  } else if (state === false) {
+    el.textContent   = "DISCONNECTED";
+    el.style.color   = "#ef4444";
+    el.style.fontSize= "0.85rem";
+  } else {
+    el.textContent   = "Waiting...";
+    el.style.color   = "#f97316";
+    el.style.fontSize= "0.85rem";
   }
 }
 
-// ================= ALERT =================
-function updateAlert(temp) {
-  const alertBox = document.getElementById("alert");
+
+// ============================================================
+//  BROWSER CONNECTION BADGE
+// ============================================================
+function setBrowserConnection(isConnected) {
+  var badge = document.getElementById("connBadge");
+  if (isConnected) {
+    badge.textContent = "ONLINE";
+    badge.className   = "conn-badge online";
+  } else {
+    badge.textContent = "OFFLINE";
+    badge.className   = "conn-badge";
+  }
+}
+
+
+// ============================================================
+//  ALERT BOX
+// ============================================================
+function updateAlert(temp, hum) {
+  // Temperature alert
+  var box  = document.getElementById("alertBox");
+  var dot  = document.getElementById("alertDot");
+  var text = document.getElementById("alertText");
 
   if (temp > 35) {
-    alertBox.innerText = "🔥 HOT";
-    alertBox.style.background = "red";
-  } 
-  else if (temp < 15) {
-    alertBox.innerText = "❄ COLD";
-    alertBox.style.background = "blue";
-  } 
-  else {
-    alertBox.innerText = "✅ NORMAL";
-    alertBox.style.background = "green";
+    text.textContent     = "High temperature! Room is HOT.";
+    dot.style.background = "#ef4444";
+    box.style.borderColor= "#fca5a5";
+  } else if (temp < 15) {
+    text.textContent     = "Low temperature! Room is COLD.";
+    dot.style.background = "#3b82f6";
+    box.style.borderColor= "#93c5fd";
+  } else {
+    text.textContent     = "Temperature is Normal.";
+    dot.style.background = "#22c55e";
+    box.style.borderColor= "#86efac";
   }
 
-  alertBox.style.color = "white";
+  // Humidity alert
+  var hbox  = document.getElementById("humAlertBox");
+  var hdot  = document.getElementById("humAlertDot");
+  var htext = document.getElementById("humAlertText");
+
+  if (hum > 70) {
+    htext.textContent    = "Humidity is HIGH. Room feels damp.";
+    hdot.style.background= "#3b82f6";
+    hbox.style.borderColor="#93c5fd";
+  } else if (hum < 30) {
+    htext.textContent    = "Humidity is LOW. Room feels dry.";
+    hdot.style.background= "#f97316";
+    hbox.style.borderColor="#fdba74";
+  } else {
+    htext.textContent    = "Humidity is Normal.";
+    hdot.style.background= "#22c55e";
+    hbox.style.borderColor="#86efac";
+  }
 }
 
-// ================= MENU =================
-function toggleMenu() {
-  const menu = document.getElementById("menu");
-  menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
+
+// ============================================================
+//  FIREBASE HISTORY (persistent across refreshes)
+// ============================================================
+function saveToHistory(temp, hum) {
+  var now  = new Date();
+  var date = now.toISOString().split("T")[0];
+  var time = now.toTimeString().slice(0, 8);
+  db.ref("/history").push({ date: date, time: time, temp: temp, hum: hum });
 }
 
+function loadHistoryFromFirebase() {
+  db.ref("/history").limitToLast(500).once("value", function(snap) {
+    var data = snap.val();
+    allHistory = data ? Object.values(data).reverse() : [];
+    filteredHistory = allHistory;
+  });
+
+  // Listen for new entries added after page load
+  db.ref("/history").limitToLast(1).on("child_added", function(snap) {
+    var record = snap.val();
+    if (!record) return;
+    allHistory.unshift(record);
+    filteredHistory = allHistory;
+    if (document.getElementById("history").style.display !== "none") {
+      renderTable(currentView);
+    }
+  });
+}
+
+
+// ============================================================
+//  HISTORY TABLE
+// ============================================================
+function renderTable(type) {
+  currentView = type;
+  var col  = type === "temp" ? "Temperature (C)" : "Humidity (%)";
+  var key  = type === "temp" ? "temp" : "hum";
+  var data = filteredHistory;
+
+  if (!data || data.length === 0) {
+    document.getElementById("list").innerHTML =
+      '<div class="empty-msg">No history records found.</div>';
+    return;
+  }
+
+  var html = '<table><thead><tr><th>Date</th><th>Time</th><th>' + col + '</th></tr></thead><tbody>';
+  data.forEach(function(h) {
+    html += '<tr><td>' + h.date + '</td><td>' + h.time + '</td><td>' + h[key] + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById("list").innerHTML = html;
+}
+
+function filterHistory() {
+  var date = document.getElementById("searchDate").value;
+  var time = document.getElementById("searchTime").value;
+  filteredHistory = allHistory.filter(function(h) {
+    var dm = !date || h.date === date;
+    var tm = !time || h.time.startsWith(time.slice(0, 5));
+    return dm && tm;
+  });
+  renderTable(currentView);
+}
+
+function resetHistory() {
+  filteredHistory = allHistory;
+  document.getElementById("searchDate").value = "";
+  document.getElementById("searchTime").value = "";
+  renderTable(currentView);
+}
+
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
 function showLive() {
-  document.getElementById("live").style.display = "block";
+  document.getElementById("live").style.display    = "block";
   document.getElementById("history").style.display = "none";
+  setActiveBtn("btn-live");
+  closeMenu();
 }
 
 function showTemp() {
-  render("temp");
+  document.getElementById("live").style.display    = "none";
+  document.getElementById("history").style.display = "block";
+  document.getElementById("historyTitle").textContent = "Temperature History";
+  setActiveBtn("btn-temp");
+  renderTable("temp");
+  closeMenu();
 }
 
 function showHum() {
-  render("hum");
+  document.getElementById("live").style.display    = "none";
+  document.getElementById("history").style.display = "block";
+  document.getElementById("historyTitle").textContent = "Humidity History";
+  setActiveBtn("btn-hum");
+  renderTable("hum");
+  closeMenu();
 }
 
-function render(type) {
-  document.getElementById("live").style.display = "none";
-  document.getElementById("history").style.display = "block";
-
-  document.getElementById("title").innerText =
-    type === "temp" ? "Temperature History" : "Humidity History";
-
-  let html = "<table><tr><th>Date</th><th>Time</th><th>Value</th></tr>";
-
-  history.forEach(h => {
-    html += `
-      <tr>
-        <td>${h.date}</td>
-        <td>${h.time}</td>
-        <td>${type === "temp" ? h.temp : h.hum}</td>
-      </tr>
-    `;
+function setActiveBtn(id) {
+  ["btn-live","btn-temp","btn-hum"].forEach(function(b) {
+    document.getElementById(b).classList.remove("active");
   });
+  document.getElementById(id).classList.add("active");
+}
 
-  html += "</table>";
+function toggleMenu() {
+  document.getElementById("menu").classList.toggle("open");
+  document.getElementById("overlay").classList.toggle("open");
+}
 
-  document.getElementById("list").innerHTML = html;
+function closeMenu() {
+  document.getElementById("menu").classList.remove("open");
+  document.getElementById("overlay").classList.remove("open");
 }
 
 function toggleDark() {
