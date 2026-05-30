@@ -30,7 +30,7 @@ window.onload = function () {
   });
 };
 
-// LIVE DATA
+// 🔥 LIVE DATA + SAVE TO FIREBASE HISTORY
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
@@ -44,20 +44,19 @@ db.ref("/room").on("value", (snap) => {
   document.getElementById("status").innerText = status;
 
   const now = new Date();
+  const date = now.toISOString().split("T")[0];
+  const time = now.toTimeString().split(" ")[0];
 
-  const entry = {
-    date: now.toISOString().split("T")[0], // YYYY-MM-DD
-    time: now.toTimeString().split(" ")[0], // HH:MM:SS
+  // 🔥 SAVE TO FIREBASE (PERMANENT HISTORY)
+  db.ref("/history").push({
+    date,
+    time,
     temp,
     hum
-  };
-
-  history.unshift(entry);
+  });
 
   // chart update
-  const label = `${entry.time}`;
-
-  chart.data.labels.push(label);
+  chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
 
@@ -77,30 +76,42 @@ db.ref("/room").on("value", (snap) => {
   else alertBox.innerText = "✅ NORMAL";
 });
 
+// 🔥 LOAD HISTORY FROM FIREBASE
+function loadHistory(callback) {
+  db.ref("/history").once("value", (snap) => {
+    history = [];
+    snap.forEach(child => {
+      history.push(child.val());
+    });
+    history.reverse();
+    callback();
+  });
+}
+
 // MENU
 function toggleMenu() {
   const menu = document.getElementById("menu");
   menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
 }
 
-// VIEW SWITCH
+// LIVE
 function showLive() {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
-// TEMP HISTORY
+// TEMP
 function showTemp() {
-  renderTable("Temperature History", "temp");
+  loadHistory(() => render("Temperature History", "temp"));
 }
 
-// HUM HISTORY
+// HUM
 function showHum() {
-  renderTable("Humidity History", "hum");
+  loadHistory(() => render("Humidity History", "hum"));
 }
 
-// TABLE RENDER (NEW FORMAT)
-function renderTable(title, type) {
+// TABLE RENDER
+function render(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
 
@@ -109,20 +120,15 @@ function renderTable(title, type) {
   buildTable(history, type);
 }
 
-// BUILD TABLE
 function buildTable(data, type) {
   let html = `
     <table>
       <tr>
         <th>Date</th>
         <th>Time</th>
-        <th>${type === "temp" ? "Temperature (°C)" : "Humidity (%)"}</th>
+        <th>${type === "temp" ? "Temp (°C)" : "Humidity (%)"}</th>
       </tr>
   `;
-
-  if (data.length === 0) {
-    html += `<tr><td colspan="3">No data</td></tr>`;
-  }
 
   data.forEach(h => {
     html += `
@@ -135,26 +141,20 @@ function buildTable(data, type) {
   });
 
   html += `</table>`;
-
   document.getElementById("list").innerHTML = html;
 }
 
-// FILTER SYSTEM (NEW 🔥)
+// FILTER
 function filterHistory() {
   const date = document.getElementById("searchDate").value;
   const time = document.getElementById("searchTime").value;
 
   let filtered = history;
 
-  if (date) {
-    filtered = filtered.filter(h => h.date === date);
-  }
+  if (date) filtered = filtered.filter(h => h.date === date);
+  if (time) filtered = filtered.filter(h => h.time.startsWith(time));
 
-  if (time) {
-    filtered = filtered.filter(h => h.time.startsWith(time));
-  }
-
-  buildTable(filtered, "temp"); // default view (you can switch if needed)
+  buildTable(filtered, "temp");
 }
 
 // RESET
