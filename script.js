@@ -9,12 +9,12 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.database();
 
-// 📊 Chart setup
+// 📊 Chart instance
 let chart;
 
+// 🚀 INIT CHART
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -22,18 +22,35 @@ window.onload = function () {
     type: "line",
     data: {
       labels: [],
-      datasets: [{
-        label: "Temperature (°C)",
-        data: [],
-        borderColor: "blue",
-        fill: false,
-        tension: 0.3
-      }]
+      datasets: [
+        {
+          label: "Temperature (°C)",
+          data: [],
+          borderColor: "red",
+          tension: 0.3,
+          fill: false
+        },
+        {
+          label: "Humidity (%)",
+          data: [],
+          borderColor: "blue",
+          tension: 0.3,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: false
+        }
+      }
     }
   });
 };
 
-// 🔁 Real-time Firebase listener
+// 🔁 REAL-TIME FIREBASE LISTENER
 db.ref("/room").on("value", (snapshot) => {
   const data = snapshot.val();
 
@@ -43,7 +60,7 @@ db.ref("/room").on("value", (snapshot) => {
   const hum = data.humidity ?? 0;
   const status = data.status ?? "--";
 
-  // UI update
+  // 🖥 UI UPDATE
   document.getElementById("temp").innerText = temp;
   document.getElementById("hum").innerText = hum;
   document.getElementById("status").innerText = status;
@@ -67,24 +84,27 @@ db.ref("/room").on("value", (snapshot) => {
     alertBox.style.color = "white";
   }
 
-  // 📈 update chart
+  // 📈 UPDATE GRAPH
   const time = new Date().toLocaleTimeString();
 
   if (chart) {
     chart.data.labels.push(time);
-    chart.data.datasets[0].data.push(temp);
 
-    // keep only last 10 points
+    chart.data.datasets[0].data.push(temp);
+    chart.data.datasets[1].data.push(hum);
+
+    // keep last 10 records only
     if (chart.data.labels.length > 10) {
       chart.data.labels.shift();
       chart.data.datasets[0].data.shift();
+      chart.data.datasets[1].data.shift();
     }
 
     chart.update();
   }
 });
 
-// 🌙 Dark mode
+// 🌙 DARK MODE TOGGLE
 function toggleDark() {
   document.body.classList.toggle("dark");
 }

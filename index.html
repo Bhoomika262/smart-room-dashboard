@@ -18,7 +18,7 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: auto;
       text-align: center;
     }
@@ -67,7 +67,7 @@
     }
 
     canvas {
-      margin-top: 25px;
+      margin-top: 30px;
       background: white;
       border-radius: 10px;
       padding: 10px;
@@ -75,6 +75,12 @@
 
     .dark canvas {
       background: #1e1e1e;
+    }
+
+    .section-title {
+      margin-top: 30px;
+      font-size: 18px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -108,6 +114,7 @@
 
   <div id="alert" class="status-box">System Normal</div>
 
+  <div class="section-title">📊 Live Sensor Graph</div>
   <canvas id="chart" width="400" height="200"></canvas>
 
 </div>
