@@ -14,23 +14,27 @@ const db = firebase.database();
 let chart;
 let history = [];
 
-// INIT CHART
+/* ================= PAGE RESTORE ================= */
 window.onload = function () {
-  const ctx = document.getElementById("chart").getContext("2d");
 
-  chart = new Chart(ctx, {
+  const page = localStorage.getItem("page") || "live";
+  if (page === "history") showHistory();
+
+  chart = new Chart(document.getElementById("chart"), {
     type: "line",
     data: {
       labels: [],
       datasets: [
-        { label: "Temperature", data: [], borderColor: "red", fill: false },
-        { label: "Humidity", data: [], borderColor: "blue", fill: false }
+        { label: "Temp", data: [], borderColor: "red" },
+        { label: "Hum", data: [], borderColor: "blue" }
       ]
     }
   });
+
+  loadHistory();
 };
 
-// 🔥 LIVE DATA + SAVE TO FIREBASE HISTORY
+/* ================= LIVE DATA ================= */
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
@@ -47,15 +51,9 @@ db.ref("/room").on("value", (snap) => {
   const date = now.toISOString().split("T")[0];
   const time = now.toTimeString().split(" ")[0];
 
-  // 🔥 SAVE TO FIREBASE (PERMANENT HISTORY)
-  db.ref("/history").push({
-    date,
-    time,
-    temp,
-    hum
-  });
+  // ONLY SAVE IF NEW DATA (PREVENT SPAM)
+  db.ref("/history").push({ date, time, temp, hum });
 
-  // chart update
   chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
@@ -68,103 +66,91 @@ db.ref("/room").on("value", (snap) => {
 
   chart.update();
 
-  // alert
-  const alertBox = document.getElementById("alert");
-
-  if (temp > 35) alertBox.innerText = "🔥 HOT";
-  else if (temp < 15) alertBox.innerText = "❄ COLD";
-  else alertBox.innerText = "✅ NORMAL";
+  document.getElementById("alert").innerText =
+    temp > 35 ? "HOT" : temp < 15 ? "COLD" : "NORMAL";
 });
 
-// 🔥 LOAD HISTORY FROM FIREBASE
-function loadHistory(callback) {
-  db.ref("/history").once("value", (snap) => {
+/* ================= LOAD HISTORY FROM FIREBASE ================= */
+function loadHistory() {
+  db.ref("/history").on("value", (snap) => {
     history = [];
+
     snap.forEach(child => {
       history.push(child.val());
     });
+
     history.reverse();
-    callback();
   });
 }
 
-// MENU
+/* ================= MENU ================= */
 function toggleMenu() {
-  const menu = document.getElementById("menu");
-  menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
+  const m = document.getElementById("menu");
+  m.style.right = (m.style.right === "0px") ? "-250px" : "0px";
 }
 
-// LIVE
+/* ================= PAGE CONTROL ================= */
 function showLive() {
+  localStorage.setItem("page", "live");
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
-// TEMP
-function showTemp() {
-  loadHistory(() => render("Temperature History", "temp"));
-}
-
-// HUM
-function showHum() {
-  loadHistory(() => render("Humidity History", "hum"));
-}
-
-// TABLE RENDER
-function render(title, type) {
+function showHistory() {
+  localStorage.setItem("page", "history");
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
-
-  document.getElementById("title").innerText = title;
-
-  buildTable(history, type);
+  render(history);
 }
 
-function buildTable(data, type) {
+/* ================= TABLE ================= */
+function render(data) {
   let html = `
     <table>
       <tr>
         <th>Date</th>
         <th>Time</th>
-        <th>${type === "temp" ? "Temp (°C)" : "Humidity (%)"}</th>
+        <th>Temp</th>
+        <th>Hum</th>
       </tr>
   `;
 
-  data.forEach(h => {
+  data.forEach(d => {
     html += `
       <tr>
-        <td>${h.date}</td>
-        <td>${h.time}</td>
-        <td>${type === "temp" ? h.temp : h.hum}</td>
+        <td>${d.date}</td>
+        <td>${d.time}</td>
+        <td>${d.temp}</td>
+        <td>${d.hum}</td>
       </tr>
     `;
   });
 
-  html += `</table>`;
-  document.getElementById("list").innerHTML = html;
+  html += "</table>";
+  document.getElementById("table").innerHTML = html;
 }
 
-// FILTER
-function filterHistory() {
-  const date = document.getElementById("searchDate").value;
-  const time = document.getElementById("searchTime").value;
+/* ================= FILTER ================= */
+function filter() {
+  const date = document.getElementById("dateFilter").value;
+  const time = document.getElementById("timeFilter").value;
 
   let filtered = history;
 
-  if (date) filtered = filtered.filter(h => h.date === date);
-  if (time) filtered = filtered.filter(h => h.time.startsWith(time));
+  if (date) filtered = filtered.filter(x => x.date === date);
+  if (time) filtered = filtered.filter(x => x.time.startsWith(time));
 
-  buildTable(filtered, "temp");
+  render(filtered);
 }
 
-// RESET
-function resetHistory() {
-  document.getElementById("searchDate").value = "";
-  document.getElementById("searchTime").value = "";
-  buildTable(history, "temp");
+/* ================= RESET ================= */
+function reset() {
+  document.getElementById("dateFilter").value = "";
+  document.getElementById("timeFilter").value = "";
+  render(history);
 }
 
-// DARK MODE
+/* ================= DARK MODE ================= */
 function toggleDark() {
   document.body.classList.toggle("dark");
 }
