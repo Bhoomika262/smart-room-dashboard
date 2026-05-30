@@ -11,8 +11,26 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+let chart;
 let history = [];
-let lastUpdateTime = 0;
+
+let lastTimestamp = 0;
+
+// ================= INIT =================
+window.onload = function () {
+  const ctx = document.getElementById("chart").getContext("2d");
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Temperature", data: [], borderColor: "red", fill: false },
+        { label: "Humidity", data: [], borderColor: "blue", fill: false }
+      ]
+    }
+  });
+};
 
 // ================= LIVE DATA =================
 db.ref("/room").on("value", (snap) => {
@@ -21,45 +39,41 @@ db.ref("/room").on("value", (snap) => {
   const temp = d?.temperature;
   const hum = d?.humidity;
 
-  // 🔥 update heartbeat
-  lastUpdateTime = Date.now();
+  const now = Date.now();
 
-  const isInvalid =
+  // 🔥 HEARTBEAT: if no data recently → disconnected
+  const isDisconnected =
     temp === undefined ||
     hum === undefined ||
     temp === null ||
     hum === null ||
     isNaN(temp) ||
-    isNaN(hum);
+    isNaN(hum) ||
+    (now - lastTimestamp > 15000); // 15 sec rule
 
-  if (isInvalid) {
-    showDisconnected();
+  const tempUI = isDisconnected ? "DISCONNECTED" : temp;
+  const humUI = isDisconnected ? "DISCONNECTED" : hum;
+
+  document.getElementById("temp").innerText = tempUI;
+  document.getElementById("hum").innerText = humUI;
+
+  const alertBox = document.getElementById("alert");
+
+  if (isDisconnected) {
+    alertBox.innerText = "⚠ SENSOR DISCONNECTED";
+    alertBox.style.background = "gray";
+    alertBox.style.color = "white";
     return;
   }
 
-  // LIVE DISPLAY
-  document.getElementById("temp").innerText = temp;
-  document.getElementById("hum").innerText = hum;
+  // ================= UPDATE TIMESTAMP =================
+  lastTimestamp = now;
 
-  // ALERT
-  const alert = document.getElementById("alert");
+  const dateObj = new Date();
+  const date = dateObj.toISOString().split("T")[0];
+  const time = dateObj.toTimeString().split(" ")[0];
 
-  if (temp > 35) {
-    alert.innerText = "🔥 HOT";
-    alert.style.background = "red";
-  } else if (temp < 15) {
-    alert.innerText = "❄ COLD";
-    alert.style.background = "blue";
-  } else {
-    alert.innerText = "✅ NORMAL";
-    alert.style.background = "green";
-  }
-
-  // SAVE HISTORY (NO SPAM)
-  const now = new Date();
-  const date = now.toISOString().split("T")[0];
-  const time = now.toTimeString().split(" ")[0];
-
+  // ================= SAVE HISTORY (WITH STATUS) =================
   db.ref("/history").push({
     date,
     time,
@@ -67,25 +81,32 @@ db.ref("/room").on("value", (snap) => {
     hum,
     status: "OK"
   });
-});
 
-// ================= DISCONNECT CHECK (REAL FIX) =================
-setInterval(() => {
-  const now = Date.now();
+  // ================= CHART =================
+  chart.data.labels.push(time);
+  chart.data.datasets[0].data.push(temp);
+  chart.data.datasets[1].data.push(hum);
 
-  if (now - lastUpdateTime > 8000) {
-    showDisconnected();
+  if (chart.data.labels.length > 10) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+    chart.data.datasets[1].data.shift();
   }
-}, 2000);
 
-function showDisconnected() {
-  document.getElementById("temp").innerText = "DISCONNECTED";
-  document.getElementById("hum").innerText = "DISCONNECTED";
+  chart.update();
 
-  const alert = document.getElementById("alert");
-  alert.innerText = "⚠ SENSOR DISCONNECTED";
-  alert.style.background = "gray";
-}
+  // ================= ALERT =================
+  if (temp > 35) {
+    alertBox.innerText = "🔥 HOT";
+    alertBox.style.background = "red";
+  } else if (temp < 15) {
+    alertBox.innerText = "❄ COLD";
+    alertBox.style.background = "blue";
+  } else {
+    alertBox.innerText = "✅ NORMAL";
+    alertBox.style.background = "green";
+  }
+});
 
 // ================= LOAD HISTORY =================
 function loadHistory(cb) {
@@ -103,35 +124,34 @@ function toggleMenu() {
   menu.style.right = menu.style.right === "0px" ? "-260px" : "0px";
 }
 
-// ================= VIEW =================
 function showLive() {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
+// ================= HISTORY =================
 function showTemp() {
-  loadHistory(() => render("Temperature History", "temp"));
+  loadHistory(() => renderTable("Temperature History", "temp"));
 }
 
 function showHum() {
-  loadHistory(() => render("Humidity History", "hum"));
+  loadHistory(() => renderTable("Humidity History", "hum"));
 }
 
-// ================= TABLE =================
-function render(title, type) {
+function renderTable(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
 
   document.getElementById("title").innerText = title;
 
   let html = `
-  <table>
-    <tr>
-      <th>Date</th>
-      <th>Time</th>
-      <th>Value</th>
-      <th>Status</th>
-    </tr>
+    <table>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>${type === "temp" ? "Temperature" : "Humidity"}</th>
+        <th>Status</th>
+      </tr>
   `;
 
   history.forEach(h => {
@@ -139,13 +159,13 @@ function render(title, type) {
       <tr>
         <td>${h.date}</td>
         <td>${h.time}</td>
-        <td>${type === "temp" ? h.temp : h.hum}</td>
-        <td>${h.status}</td>
+        <td>${h.temp ?? "DISCONNECTED"}</td>
+        <td>${h.status ?? "DISCONNECTED"}</td>
       </tr>
     `;
   });
 
-  html += "</table>";
+  html += `</table>`;
   document.getElementById("list").innerHTML = html;
 }
 
@@ -164,13 +184,13 @@ function filterHistory() {
 
 function renderFiltered(data) {
   let html = `
-  <table>
-    <tr>
-      <th>Date</th>
-      <th>Time</th>
-      <th>Value</th>
-      <th>Status</th>
-    </tr>
+    <table>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Value</th>
+        <th>Status</th>
+      </tr>
   `;
 
   data.forEach(h => {
@@ -179,12 +199,12 @@ function renderFiltered(data) {
         <td>${h.date}</td>
         <td>${h.time}</td>
         <td>${h.temp ?? h.hum ?? "DISCONNECTED"}</td>
-        <td>${h.status}</td>
+        <td>${h.status ?? "DISCONNECTED"}</td>
       </tr>
     `;
   });
 
-  html += "</table>";
+  html += `</table>`;
   document.getElementById("list").innerHTML = html;
 }
 
