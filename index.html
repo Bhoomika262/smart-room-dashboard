@@ -40,18 +40,6 @@
       cursor: pointer;
     }
 
-    /* BACKDROP (for better UX) */
-    .overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.4);
-      display: none;
-      z-index: 998;
-    }
-
     /* SIDE MENU */
     .side-menu {
       position: fixed;
@@ -64,10 +52,6 @@
       padding: 20px;
       transition: 0.3s ease;
       z-index: 999;
-    }
-
-    .side-menu.open {
-      right: 0;
     }
 
     .side-menu button {
@@ -127,8 +111,26 @@
       background: #1e1e1e;
     }
 
-    ul {
-      text-align: left;
+    /* TABLE STYLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background: #333;
+      color: white;
+    }
+
+    .dark th {
+      background: #444;
     }
   </style>
 </head>
@@ -141,14 +143,11 @@
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
-<!-- OVERLAY -->
-<div id="overlay" class="overlay" onclick="toggleMenu()"></div>
-
 <!-- SIDE MENU -->
 <div id="menu" class="side-menu">
   <h3>📂 Menu</h3>
   <button onclick="showLive()">Live Data</button>
-  <button onclick="showTemp()">Temp History</button>
+  <button onclick="showTemp()">Temperature History</button>
   <button onclick="showHum()">Humidity History</button>
   <button onclick="toggleDark()">Dark Mode</button>
 </div>
