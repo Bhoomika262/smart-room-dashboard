@@ -5,21 +5,68 @@
 
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       margin: 0;
       background: #f4f6f9;
+      transition: 0.3s;
     }
 
-    .dark { background: #121212; color: white; }
+    .dark {
+      background: #121212;
+      color: white;
+    }
 
     .topbar {
       display: flex;
       justify-content: space-between;
-      padding: 12px;
+      align-items: center;
+      padding: 12px 15px;
       background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
-    .container { padding: 20px; text-align: center; }
+    .dark .topbar {
+      background: #1e1e1e;
+    }
+
+    .menu-btn {
+      font-size: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .side-menu {
+      position: fixed;
+      top: 0;
+      right: -260px;
+      width: 240px;
+      height: 100%;
+      background: #222;
+      color: white;
+      padding: 20px;
+      transition: 0.3s;
+      z-index: 99;
+    }
+
+    .side-menu button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+      text-align: center;
+    }
 
     .grid {
       display: grid;
@@ -29,8 +76,37 @@
 
     .card {
       background: white;
-      padding: 15px;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .dark .card {
+      background: #1e1e1e;
+    }
+
+    .value {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .status-box {
+      margin-top: 15px;
+      padding: 12px;
       border-radius: 10px;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+
+    canvas {
+      margin-top: 20px;
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .dark canvas {
+      background: #1e1e1e;
     }
 
     table {
@@ -42,35 +118,44 @@
     th, td {
       border: 1px solid #ccc;
       padding: 10px;
+      text-align: center;
     }
 
-    th { background: #333; color: white; }
-
-    canvas {
-      margin-top: 20px;
-      background: white;
-      padding: 10px;
+    th {
+      background: #333;
+      color: white;
     }
 
-    .menu button {
-      margin: 5px;
+    .dark th {
+      background: #444;
+    }
+
+    .search-box input,
+    .search-box button {
       padding: 8px;
+      margin: 5px;
     }
   </style>
 </head>
 
 <body>
 
+<!-- TOP BAR -->
 <div class="topbar">
-  <h3>Smart Room</h3>
+  <h3>🏠 Smart Room Dashboard</h3>
+  <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
-<div class="menu">
+<!-- SIDE MENU -->
+<div id="menu" class="side-menu">
+  <h3>Menu</h3>
   <button onclick="showLive()">Live</button>
   <button onclick="showTemp()">Temp History</button>
   <button onclick="showHum()">Humidity History</button>
+  <button onclick="toggleDark()">Dark Mode</button>
 </div>
 
+<!-- MAIN -->
 <div class="container">
 
   <!-- LIVE -->
@@ -79,35 +164,43 @@
 
     <div class="grid">
       <div class="card">
-        <h3>Temp</h3>
-        <div id="temp">--</div>
+        <h3>Temperature</h3>
+        <div class="value" id="temp">--</div>
       </div>
 
       <div class="card">
         <h3>Humidity</h3>
-        <div id="hum">--</div>
+        <div class="value" id="hum">--</div>
       </div>
 
       <div class="card">
         <h3>Status</h3>
-        <div id="status">--</div>
+        <div class="value" id="status">--</div>
       </div>
     </div>
 
-    <div id="alert">SYSTEM</div>
+    <div id="alert" class="status-box">System Normal</div>
 
     <canvas id="chart"></canvas>
   </div>
 
   <!-- HISTORY -->
   <div id="history" style="display:none;">
-    <h2>History</h2>
+    <h2 id="title">History</h2>
+
+    <div class="search-box">
+      <input type="date" id="searchDate">
+      <input type="time" id="searchTime">
+      <button onclick="filterHistory()">Search</button>
+      <button onclick="resetHistory()">Reset</button>
+    </div>
 
     <div id="list"></div>
   </div>
 
 </div>
 
+<!-- SCRIPTS -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
