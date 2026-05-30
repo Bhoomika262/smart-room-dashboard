@@ -13,8 +13,10 @@ const db = firebase.database();
 
 let chart;
 let history = [];
-let lastUpdate = Date.now(); // ⭐ IMPORTANT
+let lastUpdate = Date.now();
+let isOffline = false; // ⭐ NEW LOCK
 
+// INIT
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -29,16 +31,21 @@ window.onload = function () {
     }
   });
 
-  // 🔥 check every 3 sec
-  setInterval(checkOffline, 3000);
+  setInterval(checkOffline, 2000);
 };
 
-// ================= LIVE DATA =================
+// ================= FIREBASE DATA =================
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
 
-  lastUpdate = Date.now(); // reset timer
+  const now = Date.now();
+  lastUpdate = now;
+
+  // ⭐ If was offline → come back online
+  if (isOffline) {
+    isOffline = false;
+  }
 
   const temp = d.temperature;
   const hum = d.humidity;
@@ -50,9 +57,9 @@ db.ref("/room").on("value", (snap) => {
 
   updateAlert(temp);
 
-  const now = new Date();
-  const date = now.toISOString().split("T")[0];
-  const time = now.toTimeString().split(" ")[0];
+  const dateObj = new Date();
+  const date = dateObj.toISOString().split("T")[0];
+  const time = dateObj.toTimeString().split(" ")[0];
 
   history.unshift({ date, time, temp, hum });
 
@@ -69,11 +76,13 @@ db.ref("/room").on("value", (snap) => {
   chart.update();
 });
 
-// ================= OFFLINE CHECK =================
+// ================= OFFLINE SYSTEM (FIXED) =================
 function checkOffline() {
   const now = Date.now();
 
-  if (now - lastUpdate > 8000) { // 8 sec no data
+  if (now - lastUpdate > 8000 && !isOffline) {
+    isOffline = true;
+
     document.getElementById("temp").innerText = "DISCONNECTED";
     document.getElementById("hum").innerText = "DISCONNECTED";
     document.getElementById("status").innerText = "OFFLINE";
@@ -87,6 +96,8 @@ function checkOffline() {
 
 // ================= ALERT =================
 function updateAlert(temp) {
+  if (isOffline) return; // ⭐ STOP overwriting offline state
+
   const alertBox = document.getElementById("alert");
 
   if (temp > 35) {
@@ -125,8 +136,10 @@ function showHum() {
 }
 
 function render(type) {
-  document.getElementById("live").style.display = "none";
+  document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "block";
+
+  document.getElementById("live").style.display = "none";
 
   document.getElementById("title").innerText =
     type === "temp" ? "Temperature History" : "Humidity History";
@@ -144,7 +157,6 @@ function render(type) {
   });
 
   html += "</table>";
-
   document.getElementById("list").innerHTML = html;
 }
 
