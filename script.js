@@ -14,7 +14,7 @@ const db = firebase.database();
 let chart;
 let history = [];
 
-// CHART INIT
+// INIT CHART
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -43,11 +43,21 @@ db.ref("/room").on("value", (snap) => {
   document.getElementById("hum").innerText = hum;
   document.getElementById("status").innerText = status;
 
-  const time = new Date().toLocaleString();
+  const now = new Date();
 
-  history.unshift({ time, temp, hum });
+  const entry = {
+    date: now.toISOString().split("T")[0], // YYYY-MM-DD
+    time: now.toTimeString().split(" ")[0], // HH:MM:SS
+    temp,
+    hum
+  };
 
-  chart.data.labels.push(time);
+  history.unshift(entry);
+
+  // chart update
+  const label = `${entry.time}`;
+
+  chart.data.labels.push(label);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
 
@@ -59,7 +69,7 @@ db.ref("/room").on("value", (snap) => {
 
   chart.update();
 
-  // ALERT
+  // alert
   const alertBox = document.getElementById("alert");
 
   if (temp > 35) alertBox.innerText = "🔥 HOT";
@@ -73,44 +83,51 @@ function toggleMenu() {
   menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
 }
 
-// LIVE
+// VIEW SWITCH
 function showLive() {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
-// TEMP
+// TEMP HISTORY
 function showTemp() {
   renderTable("Temperature History", "temp");
 }
 
-// HUM
+// HUM HISTORY
 function showHum() {
   renderTable("Humidity History", "hum");
 }
 
-// TABLE RENDER
+// TABLE RENDER (NEW FORMAT)
 function renderTable(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
 
   document.getElementById("title").innerText = title;
 
+  buildTable(history, type);
+}
+
+// BUILD TABLE
+function buildTable(data, type) {
   let html = `
     <table>
       <tr>
+        <th>Date</th>
         <th>Time</th>
         <th>${type === "temp" ? "Temperature (°C)" : "Humidity (%)"}</th>
       </tr>
   `;
 
-  if (history.length === 0) {
-    html += `<tr><td colspan="2">No data</td></tr>`;
+  if (data.length === 0) {
+    html += `<tr><td colspan="3">No data</td></tr>`;
   }
 
-  history.forEach(h => {
+  data.forEach(h => {
     html += `
       <tr>
+        <td>${h.date}</td>
         <td>${h.time}</td>
         <td>${type === "temp" ? h.temp : h.hum}</td>
       </tr>
@@ -120,6 +137,31 @@ function renderTable(title, type) {
   html += `</table>`;
 
   document.getElementById("list").innerHTML = html;
+}
+
+// FILTER SYSTEM (NEW 🔥)
+function filterHistory() {
+  const date = document.getElementById("searchDate").value;
+  const time = document.getElementById("searchTime").value;
+
+  let filtered = history;
+
+  if (date) {
+    filtered = filtered.filter(h => h.date === date);
+  }
+
+  if (time) {
+    filtered = filtered.filter(h => h.time.startsWith(time));
+  }
+
+  buildTable(filtered, "temp"); // default view (you can switch if needed)
+}
+
+// RESET
+function resetHistory() {
+  document.getElementById("searchDate").value = "";
+  document.getElementById("searchTime").value = "";
+  buildTable(history, "temp");
 }
 
 // DARK MODE

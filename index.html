@@ -111,7 +111,7 @@
       background: #1e1e1e;
     }
 
-    /* TABLE STYLE */
+    /* TABLE */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -131,6 +131,21 @@
 
     .dark th {
       background: #444;
+    }
+
+    /* SEARCH BOX */
+    .search-box {
+      margin: 10px 0;
+    }
+
+    .search-box input {
+      padding: 8px;
+      margin: 5px;
+    }
+
+    .search-box button {
+      padding: 8px 12px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -184,6 +199,15 @@
   <!-- HISTORY -->
   <div id="history" style="display:none;">
     <h2 id="title">History</h2>
+
+    <!-- SEARCH -->
+    <div class="search-box">
+      <input type="date" id="searchDate">
+      <input type="time" id="searchTime">
+      <button onclick="filterHistory()">Search</button>
+      <button onclick="resetHistory()">Reset</button>
+    </div>
+
     <div id="list"></div>
   </div>
 
