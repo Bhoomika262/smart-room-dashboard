@@ -1,194 +1,170 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Smart Room Dashboard</title>
+const firebaseConfig = {
+  apiKey: "AIzaSyB17WZ0At7da-f4aUajp2JRUoMJIIv94k",
+  authDomain: "smart-room-100e5.firebaseapp.com",
+  databaseURL: "https://smart-room-100e5-default-rtdb.firebaseio.com",
+  projectId: "smart-room-100e5",
+  storageBucket: "smart-room-100e5.appspot.com",
+  messagingSenderId: "947555847929",
+  appId: "1:947555847929:web:bbe1a05020e1c5ec579c28"
+};
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #f4f6f9;
-      transition: 0.3s;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let chart;
+let history = [];
+
+// INIT CHART
+window.onload = function () {
+  const ctx = document.getElementById("chart").getContext("2d");
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Temperature", data: [], borderColor: "red", fill: false },
+        { label: "Humidity", data: [], borderColor: "blue", fill: false }
+      ]
     }
+  });
+};
 
-    .dark {
-      background: #121212;
-      color: white;
-    }
+// 🔥 LIVE DATA + SAVE TO FIREBASE HISTORY
+db.ref("/room").on("value", (snap) => {
+  const d = snap.val();
+  if (!d) return;
 
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 15px;
-      background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      position: sticky;
-      top: 0;
-    }
+  const temp = d.temperature;
+  const hum = d.humidity;
+  const status = d.status;
 
-    .menu-btn {
-      font-size: 24px;
-      background: none;
-      border: none;
-      cursor: pointer;
-    }
+  document.getElementById("temp").innerText = temp;
+  document.getElementById("hum").innerText = hum;
+  document.getElementById("status").innerText = status;
 
-    .side-menu {
-      position: fixed;
-      top: 0;
-      right: -260px;
-      width: 240px;
-      height: 100%;
-      background: #222;
-      color: white;
-      padding: 20px;
-      transition: 0.3s;
-    }
+  const now = new Date();
+  const date = now.toISOString().split("T")[0];
+  const time = now.toTimeString().split(" ")[0];
 
-    .side-menu button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
+  // 🔥 SAVE TO FIREBASE (PERMANENT HISTORY)
+  db.ref("/history").push({
+    date,
+    time,
+    temp,
+    hum
+  });
 
-    .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 20px;
-      text-align: center;
-    }
+  // chart update
+  chart.data.labels.push(time);
+  chart.data.datasets[0].data.push(temp);
+  chart.data.datasets[1].data.push(hum);
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 15px;
-    }
+  if (chart.data.labels.length > 10) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+    chart.data.datasets[1].data.shift();
+  }
 
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
+  chart.update();
 
-    .dark .card {
-      background: #1e1e1e;
-    }
+  // alert
+  const alertBox = document.getElementById("alert");
 
-    .value {
-      font-size: 28px;
-      font-weight: bold;
-    }
+  if (temp > 35) alertBox.innerText = "🔥 HOT";
+  else if (temp < 15) alertBox.innerText = "❄ COLD";
+  else alertBox.innerText = "✅ NORMAL";
+});
 
-    .status-box {
-      margin-top: 15px;
-      padding: 12px;
-      border-radius: 10px;
-      font-weight: bold;
-    }
+// 🔥 LOAD HISTORY FROM FIREBASE
+function loadHistory(callback) {
+  db.ref("/history").once("value", (snap) => {
+    history = [];
+    snap.forEach(child => {
+      history.push(child.val());
+    });
+    history.reverse();
+    callback();
+  });
+}
 
-    canvas {
-      margin-top: 20px;
-      background: white;
-      border-radius: 10px;
-      padding: 10px;
-    }
+// MENU
+function toggleMenu() {
+  const menu = document.getElementById("menu");
+  menu.style.right = (menu.style.right === "0px") ? "-260px" : "0px";
+}
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-    }
+// LIVE
+function showLive() {
+  document.getElementById("live").style.display = "block";
+  document.getElementById("history").style.display = "none";
+}
 
-    th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
-    }
+// TEMP
+function showTemp() {
+  loadHistory(() => render("Temperature History", "temp"));
+}
 
-    th {
-      background: #333;
-      color: white;
-    }
+// HUM
+function showHum() {
+  loadHistory(() => render("Humidity History", "hum"));
+}
 
-    .search-box input {
-      padding: 8px;
-      margin: 5px;
-    }
+// TABLE RENDER
+function render(title, type) {
+  document.getElementById("live").style.display = "none";
+  document.getElementById("history").style.display = "block";
 
-    .search-box button {
-      padding: 8px 12px;
-      cursor: pointer;
-    }
-  </style>
-</head>
+  document.getElementById("title").innerText = title;
 
-<body>
+  buildTable(history, type);
+}
 
-<div class="topbar">
-  <h3>🏠 Smart Room Dashboard</h3>
-  <button class="menu-btn" onclick="toggleMenu()">☰</button>
-</div>
+function buildTable(data, type) {
+  let html = `
+    <table>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>${type === "temp" ? "Temp (°C)" : "Humidity (%)"}</th>
+      </tr>
+  `;
 
-<div id="menu" class="side-menu">
-  <h3>Menu</h3>
-  <button onclick="showLive()">Live</button>
-  <button onclick="showTemp()">Temp History</button>
-  <button onclick="showHum()">Humidity History</button>
-  <button onclick="toggleDark()">Dark Mode</button>
-</div>
+  data.forEach(h => {
+    html += `
+      <tr>
+        <td>${h.date}</td>
+        <td>${h.time}</td>
+        <td>${type === "temp" ? h.temp : h.hum}</td>
+      </tr>
+    `;
+  });
 
-<div class="container">
+  html += `</table>`;
+  document.getElementById("list").innerHTML = html;
+}
 
-  <!-- LIVE -->
-  <div id="live">
-    <h2>Live Data</h2>
+// FILTER
+function filterHistory() {
+  const date = document.getElementById("searchDate").value;
+  const time = document.getElementById("searchTime").value;
 
-    <div class="grid">
-      <div class="card">
-        <h3>Temperature</h3>
-        <div class="value" id="temp">--</div>
-      </div>
+  let filtered = history;
 
-      <div class="card">
-        <h3>Humidity</h3>
-        <div class="value" id="hum">--</div>
-      </div>
+  if (date) filtered = filtered.filter(h => h.date === date);
+  if (time) filtered = filtered.filter(h => h.time.startsWith(time));
 
-      <div class="card">
-        <h3>Status</h3>
-        <div class="value" id="status">--</div>
-      </div>
-    </div>
+  buildTable(filtered, "temp");
+}
 
-    <div id="alert" class="status-box">System Normal</div>
+// RESET
+function resetHistory() {
+  document.getElementById("searchDate").value = "";
+  document.getElementById("searchTime").value = "";
+  buildTable(history, "temp");
+}
 
-    <canvas id="chart"></canvas>
-  </div>
-
-  <!-- HISTORY -->
-  <div id="history" style="display:none;">
-    <h2 id="title">History</h2>
-
-    <div class="search-box">
-      <input type="date" id="searchDate">
-      <input type="time" id="searchTime">
-      <button onclick="filterHistory()">Search</button>
-      <button onclick="resetHistory()">Reset</button>
-    </div>
-
-    <div id="list"></div>
-  </div>
-
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script src="script.js"></script>
-
-</body>
-</html>
+// DARK MODE
+function toggleDark() {
+  document.body.classList.toggle("dark");
+}
