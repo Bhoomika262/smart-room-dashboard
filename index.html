@@ -4,7 +4,12 @@
   <title>Smart Room Dashboard</title>
 
   <style>
-    body { font-family: Arial; margin: 0; background: #f4f6f9; }
+    body {
+      font-family: Arial;
+      margin: 0;
+      background: #f4f6f9;
+    }
+
     .dark { background: #121212; color: white; }
 
     .topbar {
@@ -12,20 +17,6 @@
       justify-content: space-between;
       padding: 12px;
       background: white;
-      position: sticky;
-      top: 0;
-    }
-
-    .side-menu {
-      position: fixed;
-      top: 0;
-      right: -260px;
-      width: 240px;
-      height: 100%;
-      background: #222;
-      color: white;
-      padding: 20px;
-      transition: 0.3s;
     }
 
     .container { padding: 20px; text-align: center; }
@@ -38,7 +29,7 @@
 
     .card {
       background: white;
-      padding: 20px;
+      padding: 15px;
       border-radius: 10px;
     }
 
@@ -51,7 +42,6 @@
     th, td {
       border: 1px solid #ccc;
       padding: 10px;
-      text-align: center;
     }
 
     th { background: #333; color: white; }
@@ -61,6 +51,11 @@
       background: white;
       padding: 10px;
     }
+
+    .menu button {
+      margin: 5px;
+      padding: 8px;
+    }
   </style>
 </head>
 
@@ -68,11 +63,9 @@
 
 <div class="topbar">
   <h3>Smart Room</h3>
-  <button onclick="toggleMenu()">☰</button>
 </div>
 
-<div id="menu" class="side-menu">
-  <h3>Menu</h3>
+<div class="menu">
   <button onclick="showLive()">Live</button>
   <button onclick="showTemp()">Temp History</button>
   <button onclick="showHum()">Humidity History</button>
@@ -101,19 +94,14 @@
       </div>
     </div>
 
-    <div id="alert">System</div>
+    <div id="alert">SYSTEM</div>
 
     <canvas id="chart"></canvas>
   </div>
 
   <!-- HISTORY -->
   <div id="history" style="display:none;">
-    <h2 id="title">History</h2>
-
-    <input type="date" id="searchDate">
-    <input type="time" id="searchTime">
-    <button onclick="filterHistory()">Search</button>
-    <button onclick="resetHistory()">Reset</button>
+    <h2>History</h2>
 
     <div id="list"></div>
   </div>
