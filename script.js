@@ -12,52 +12,54 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let history = [];
+let lastUpdateTime = 0;
 
-// LIVE DATA
+// ================= LIVE DATA =================
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
 
   const temp = d?.temperature;
   const hum = d?.humidity;
-  const lastSeen = d?.lastSeen;
 
-  const now = Date.now();
+  // 🔥 update heartbeat
+  lastUpdateTime = Date.now();
 
-  // 🚨 DISCONNECT RULE (CRITICAL FIX)
-  const isDisconnected =
-    !lastSeen || (now - lastSeen > 8000); // 8 seconds
+  const isInvalid =
+    temp === undefined ||
+    hum === undefined ||
+    temp === null ||
+    hum === null ||
+    isNaN(temp) ||
+    isNaN(hum);
 
-  if (isDisconnected) {
-    document.getElementById("temp").innerText = "DISCONNECTED";
-    document.getElementById("hum").innerText = "DISCONNECTED";
-    document.getElementById("alert").innerText = "⚠ SENSOR OFFLINE";
-    document.getElementById("alert").style.background = "gray";
+  if (isInvalid) {
+    showDisconnected();
     return;
   }
 
-  // LIVE DATA
+  // LIVE DISPLAY
   document.getElementById("temp").innerText = temp;
   document.getElementById("hum").innerText = hum;
 
-  // ALERTS
+  // ALERT
+  const alert = document.getElementById("alert");
+
   if (temp > 35) {
-    document.getElementById("alert").innerText = "🔥 HOT";
-    document.getElementById("alert").style.background = "red";
+    alert.innerText = "🔥 HOT";
+    alert.style.background = "red";
   } else if (temp < 15) {
-    document.getElementById("alert").innerText = "❄ COLD";
-    document.getElementById("alert").style.background = "blue";
+    alert.innerText = "❄ COLD";
+    alert.style.background = "blue";
   } else {
-    document.getElementById("alert").innerText = "✅ NORMAL";
-    document.getElementById("alert").style.background = "green";
+    alert.innerText = "✅ NORMAL";
+    alert.style.background = "green";
   }
-});
 
-  // time
-  const dateObj = new Date();
-  const date = dateObj.toISOString().split("T")[0];
-  const time = dateObj.toTimeString().split(" ")[0];
+  // SAVE HISTORY (NO SPAM)
+  const now = new Date();
+  const date = now.toISOString().split("T")[0];
+  const time = now.toTimeString().split(" ")[0];
 
-  // save history
   db.ref("/history").push({
     date,
     time,
@@ -65,18 +67,27 @@ db.ref("/room").on("value", (snap) => {
     hum,
     status: "OK"
   });
-
-  // alert
-  if (temp > 35) {
-    document.getElementById("alert").innerText = "🔥 HOT";
-  } else if (temp < 15) {
-    document.getElementById("alert").innerText = "❄ COLD";
-  } else {
-    document.getElementById("alert").innerText = "✅ NORMAL";
-  }
 });
 
-// LOAD HISTORY
+// ================= DISCONNECT CHECK (REAL FIX) =================
+setInterval(() => {
+  const now = Date.now();
+
+  if (now - lastUpdateTime > 8000) {
+    showDisconnected();
+  }
+}, 2000);
+
+function showDisconnected() {
+  document.getElementById("temp").innerText = "DISCONNECTED";
+  document.getElementById("hum").innerText = "DISCONNECTED";
+
+  const alert = document.getElementById("alert");
+  alert.innerText = "⚠ SENSOR DISCONNECTED";
+  alert.style.background = "gray";
+}
+
+// ================= LOAD HISTORY =================
 function loadHistory(cb) {
   db.ref("/history").once("value", (snap) => {
     history = [];
@@ -86,13 +97,13 @@ function loadHistory(cb) {
   });
 }
 
-// MENU
+// ================= MENU =================
 function toggleMenu() {
   const menu = document.getElementById("menu");
   menu.style.right = menu.style.right === "0px" ? "-260px" : "0px";
 }
 
-// VIEW
+// ================= VIEW =================
 function showLive() {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
@@ -106,7 +117,7 @@ function showHum() {
   loadHistory(() => render("Humidity History", "hum"));
 }
 
-// TABLE
+// ================= TABLE =================
 function render(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
@@ -135,11 +146,10 @@ function render(title, type) {
   });
 
   html += "</table>";
-
   document.getElementById("list").innerHTML = html;
 }
 
-// SEARCH
+// ================= SEARCH =================
 function filterHistory() {
   const date = document.getElementById("searchDate").value;
   const time = document.getElementById("searchTime").value;
@@ -168,7 +178,7 @@ function renderFiltered(data) {
       <tr>
         <td>${h.date}</td>
         <td>${h.time}</td>
-        <td>${h.temp || h.hum}</td>
+        <td>${h.temp ?? h.hum ?? "DISCONNECTED"}</td>
         <td>${h.status}</td>
       </tr>
     `;
@@ -178,14 +188,14 @@ function renderFiltered(data) {
   document.getElementById("list").innerHTML = html;
 }
 
-// RESET
+// ================= RESET =================
 function resetHistory() {
   document.getElementById("searchDate").value = "";
   document.getElementById("searchTime").value = "";
   renderFiltered(history);
 }
 
-// DARK MODE
+// ================= DARK MODE =================
 function toggleDark() {
   document.body.classList.toggle("dark");
 }
