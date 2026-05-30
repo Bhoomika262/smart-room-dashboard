@@ -24,6 +24,9 @@
       padding: 12px 15px;
       background: white;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
     .dark .topbar {
@@ -31,23 +34,40 @@
     }
 
     .menu-btn {
-      font-size: 22px;
+      font-size: 24px;
       background: none;
       border: none;
       cursor: pointer;
+    }
+
+    /* BACKDROP (for better UX) */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      z-index: 998;
     }
 
     /* SIDE MENU */
     .side-menu {
       position: fixed;
       top: 0;
-      right: -220px;
-      width: 220px;
+      right: -260px;
+      width: 240px;
       height: 100%;
       background: #222;
       color: white;
       padding: 20px;
-      transition: 0.3s;
+      transition: 0.3s ease;
+      z-index: 999;
+    }
+
+    .side-menu.open {
+      right: 0;
     }
 
     .side-menu button {
@@ -55,6 +75,8 @@
       padding: 10px;
       margin-top: 10px;
       cursor: pointer;
+      border: none;
+      border-radius: 6px;
     }
 
     /* MAIN */
@@ -115,13 +137,16 @@
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <h3>🏠 Smart Room</h3>
+  <h3>🏠 Smart Room Dashboard</h3>
   <button class="menu-btn" onclick="toggleMenu()">☰</button>
 </div>
 
+<!-- OVERLAY -->
+<div id="overlay" class="overlay" onclick="toggleMenu()"></div>
+
 <!-- SIDE MENU -->
 <div id="menu" class="side-menu">
-  <h3>Menu</h3>
+  <h3>📂 Menu</h3>
   <button onclick="showLive()">Live Data</button>
   <button onclick="showTemp()">Temp History</button>
   <button onclick="showHum()">Humidity History</button>

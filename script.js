@@ -14,7 +14,7 @@ const db = firebase.database();
 let chart;
 let history = [];
 
-// INIT CHART
+// ================= INIT CHART =================
 window.onload = function () {
   const ctx = document.getElementById("chart").getContext("2d");
 
@@ -24,23 +24,25 @@ window.onload = function () {
       labels: [],
       datasets: [
         {
-          label: "Temperature",
+          label: "Temperature (°C)",
           data: [],
           borderColor: "red",
-          fill: false
+          fill: false,
+          tension: 0.3
         },
         {
-          label: "Humidity",
+          label: "Humidity (%)",
           data: [],
           borderColor: "blue",
-          fill: false
+          fill: false,
+          tension: 0.3
         }
       ]
     }
   });
 };
 
-// LIVE DATA
+// ================= LIVE DATA =================
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
   if (!d) return;
@@ -49,22 +51,37 @@ db.ref("/room").on("value", (snap) => {
   const hum = d.humidity;
   const status = d.status;
 
+  // UI update
   document.getElementById("temp").innerText = temp;
   document.getElementById("hum").innerText = hum;
   document.getElementById("status").innerText = status;
 
-  // alert
+  // ALERT SYSTEM
   const alertBox = document.getElementById("alert");
 
-  if (temp > 35) alertBox.innerText = "🔥 HOT";
-  else if (temp < 15) alertBox.innerText = "❄ COLD";
-  else alertBox.innerText = "✅ NORMAL";
+  if (temp > 35) {
+    alertBox.innerText = "🔥 TOO HOT";
+    alertBox.style.background = "red";
+    alertBox.style.color = "white";
+  } 
+  else if (temp < 15) {
+    alertBox.innerText = "❄ TOO COLD";
+    alertBox.style.background = "blue";
+    alertBox.style.color = "white";
+  } 
+  else {
+    alertBox.innerText = "✅ NORMAL";
+    alertBox.style.background = "green";
+    alertBox.style.color = "white";
+  }
 
-  // history save
+  // TIME
   const time = new Date().toLocaleString();
+
+  // STORE HISTORY (temporary)
   history.unshift({ time, temp, hum });
 
-  // chart
+  // UPDATE CHART
   chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
@@ -78,30 +95,30 @@ db.ref("/room").on("value", (snap) => {
   chart.update();
 });
 
-// MENU
+// ================= MENU (FIXED) =================
 function toggleMenu() {
-  const m = document.getElementById("menu");
-  m.style.right = (m.style.right === "0px") ? "-220px" : "0px";
+  const menu = document.getElementById("menu");
+  const isOpen = menu.style.right === "0px";
+
+  menu.style.right = isOpen ? "-260px" : "0px";
 }
 
-// SHOW LIVE
+// ================= VIEW SWITCH =================
 function showLive() {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
-// TEMP HISTORY
+// ================= HISTORY =================
 function showTemp() {
-  showHistory("Temperature History", "temp");
+  renderHistory("Temperature History", "temp");
 }
 
-// HUM HISTORY
 function showHum() {
-  showHistory("Humidity History", "hum");
+  renderHistory("Humidity History", "hum");
 }
 
-// HISTORY VIEW
-function showHistory(title, type) {
+function renderHistory(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
 
@@ -109,8 +126,16 @@ function showHistory(title, type) {
 
   let html = "<ul>";
 
-  history.forEach(h => {
-    html += `<li>${h.time} → ${type === "temp" ? h.temp + "°C" : h.hum + "%"}</li>`;
+  if (history.length === 0) {
+    html += "<li>No history yet</li>";
+  }
+
+  history.forEach(item => {
+    if (type === "temp") {
+      html += `<li>🕒 ${item.time} → 🌡 ${item.temp}°C</li>`;
+    } else {
+      html += `<li>🕒 ${item.time} → 💧 ${item.hum}%</li>`;
+    }
   });
 
   html += "</ul>";
@@ -118,7 +143,7 @@ function showHistory(title, type) {
   document.getElementById("list").innerHTML = html;
 }
 
-// DARK MODE
+// ================= DARK MODE =================
 function toggleDark() {
   document.body.classList.toggle("dark");
 }
