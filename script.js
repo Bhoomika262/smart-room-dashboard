@@ -22,18 +22,35 @@ db.ref("/room").on("value", (snap) => {
   const lastSeen = d?.lastSeen;
 
   const now = Date.now();
-  const isDisconnected = !lastSeen || (now - lastSeen > 10000);
 
-  document.getElementById("temp").innerText =
-    isDisconnected ? "DISCONNECTED" : temp;
-
-  document.getElementById("hum").innerText =
-    isDisconnected ? "DISCONNECTED" : hum;
+  // 🚨 DISCONNECT RULE (CRITICAL FIX)
+  const isDisconnected =
+    !lastSeen || (now - lastSeen > 8000); // 8 seconds
 
   if (isDisconnected) {
-    document.getElementById("alert").innerText = "⚠ SENSOR DISCONNECTED";
+    document.getElementById("temp").innerText = "DISCONNECTED";
+    document.getElementById("hum").innerText = "DISCONNECTED";
+    document.getElementById("alert").innerText = "⚠ SENSOR OFFLINE";
+    document.getElementById("alert").style.background = "gray";
     return;
   }
+
+  // LIVE DATA
+  document.getElementById("temp").innerText = temp;
+  document.getElementById("hum").innerText = hum;
+
+  // ALERTS
+  if (temp > 35) {
+    document.getElementById("alert").innerText = "🔥 HOT";
+    document.getElementById("alert").style.background = "red";
+  } else if (temp < 15) {
+    document.getElementById("alert").innerText = "❄ COLD";
+    document.getElementById("alert").style.background = "blue";
+  } else {
+    document.getElementById("alert").innerText = "✅ NORMAL";
+    document.getElementById("alert").style.background = "green";
+  }
+});
 
   // time
   const dateObj = new Date();
