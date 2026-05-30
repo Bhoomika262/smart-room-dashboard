@@ -2,17 +2,124 @@
 <html>
 <head>
   <title>Smart Room Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+      transition: 0.3s;
+    }
+
+    .dark {
+      background: #121212;
+      color: white;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .dark .card {
+      background: #1e1e1e;
+    }
+
+    .value {
+      font-size: 28px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .status-box {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+
+    .btn {
+      margin-top: 15px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    canvas {
+      margin-top: 25px;
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .dark canvas {
+      background: #1e1e1e;
+    }
+  </style>
 </head>
+
 <body>
-  <h1>Smart Room Monitor</h1>
 
-  <h2>Temperature: <span id="temp">--</span> °C</h2>
-  <h2>Humidity: <span id="hum">--</span> %</h2>
-  <h2>Status: <span id="status">--</span></h2>
+<div class="container">
 
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <h1>🏠 Smart Room Monitor</h1>
+
+  <button class="btn" onclick="toggleDark()">🌙 Toggle Dark Mode</button>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Temperature</h3>
+      <div class="value" id="temp">--</div>
+      °C
+    </div>
+
+    <div class="card">
+      <h3>Humidity</h3>
+      <div class="value" id="hum">--</div>
+      %
+    </div>
+
+    <div class="card">
+      <h3>Status</h3>
+      <div class="value" id="status">--</div>
+    </div>
+  </div>
+
+  <div id="alert" class="status-box">System Normal</div>
+
+  <canvas id="chart" width="400" height="200"></canvas>
+
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
-  <script src="script.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="script.js"></script>
+
 </body>
 </html>
