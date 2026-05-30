@@ -1,5 +1,5 @@
 const firebaseConfig = {
-  apiKey: "AIzaSyB17WZ0At7da-f4aUajp2JRUoMJIIv94k",
+  apiKey: "AIzaSyB17WZ0At7da-f4Uajp2JRUoMJIIv94k",
   authDomain: "smart-room-100e5.firebaseapp.com",
   databaseURL: "https://smart-room-100e5-default-rtdb.firebaseio.com",
   projectId: "smart-room-100e5",
@@ -13,11 +13,10 @@ const db = firebase.database();
 
 let chart;
 let history = [];
+let lastSeen = Date.now();
 
-let lastTimestamp = 0;
-
-// ================= INIT =================
-window.onload = function () {
+// INIT
+window.onload = () => {
   const ctx = document.getElementById("chart").getContext("2d");
 
   chart = new Chart(ctx, {
@@ -25,64 +24,47 @@ window.onload = function () {
     data: {
       labels: [],
       datasets: [
-        { label: "Temperature", data: [], borderColor: "red", fill: false },
-        { label: "Humidity", data: [], borderColor: "blue", fill: false }
+        { label: "Temp", data: [], borderColor: "red" },
+        { label: "Hum", data: [], borderColor: "blue" }
       ]
     }
   });
 };
 
-// ================= LIVE DATA =================
+// LIVE DATA
 db.ref("/room").on("value", (snap) => {
   const d = snap.val();
+
+  const now = Date.now();
 
   const temp = d?.temperature;
   const hum = d?.humidity;
 
-  const now = Date.now();
+  const disconnected =
+    !d ||
+    temp == null ||
+    hum == null ||
+    (now - lastSeen > 15000);
 
-  // 🔥 HEARTBEAT: if no data recently → disconnected
-  const isDisconnected =
-    temp === undefined ||
-    hum === undefined ||
-    temp === null ||
-    hum === null ||
-    isNaN(temp) ||
-    isNaN(hum) ||
-    (now - lastTimestamp > 15000); // 15 sec rule
-
-  const tempUI = isDisconnected ? "DISCONNECTED" : temp;
-  const humUI = isDisconnected ? "DISCONNECTED" : hum;
-
-  document.getElementById("temp").innerText = tempUI;
-  document.getElementById("hum").innerText = humUI;
-
-  const alertBox = document.getElementById("alert");
-
-  if (isDisconnected) {
-    alertBox.innerText = "⚠ SENSOR DISCONNECTED";
-    alertBox.style.background = "gray";
-    alertBox.style.color = "white";
+  if (disconnected) {
+    document.getElementById("temp").innerText = "DISCONNECTED";
+    document.getElementById("hum").innerText = "DISCONNECTED";
+    document.getElementById("status").innerText = "DISCONNECTED";
+    document.getElementById("alert").innerText = "⚠ SENSOR OFF";
     return;
   }
 
-  // ================= UPDATE TIMESTAMP =================
-  lastTimestamp = now;
+  lastSeen = now;
 
-  const dateObj = new Date();
-  const date = dateObj.toISOString().split("T")[0];
-  const time = dateObj.toTimeString().split(" ")[0];
+  document.getElementById("temp").innerText = temp;
+  document.getElementById("hum").innerText = hum;
+  document.getElementById("status").innerText = d.status;
 
-  // ================= SAVE HISTORY (WITH STATUS) =================
-  db.ref("/history").push({
-    date,
-    time,
-    temp,
-    hum,
-    status: "OK"
-  });
+  const date = new Date().toISOString().split("T")[0];
+  const time = new Date().toTimeString().split(" ")[0];
 
-  // ================= CHART =================
+  db.ref("/history").push({ date, time, temp, hum, status: "OK" });
+
   chart.data.labels.push(time);
   chart.data.datasets[0].data.push(temp);
   chart.data.datasets[1].data.push(hum);
@@ -95,127 +77,100 @@ db.ref("/room").on("value", (snap) => {
 
   chart.update();
 
-  // ================= ALERT =================
-  if (temp > 35) {
-    alertBox.innerText = "🔥 HOT";
-    alertBox.style.background = "red";
-  } else if (temp < 15) {
-    alertBox.innerText = "❄ COLD";
-    alertBox.style.background = "blue";
-  } else {
-    alertBox.innerText = "✅ NORMAL";
-    alertBox.style.background = "green";
-  }
+  document.getElementById("alert").innerText =
+    temp > 35 ? "🔥 HOT" : temp < 15 ? "❄ COLD" : "✅ NORMAL";
 });
 
-// ================= LOAD HISTORY =================
+// LOAD HISTORY
 function loadHistory(cb) {
   db.ref("/history").once("value", (snap) => {
     history = [];
-    snap.forEach(c => history.push(c.val()));
+    snap.forEach(x => history.push(x.val()));
     history.reverse();
     cb();
   });
 }
 
-// ================= MENU =================
+// MENU
 function toggleMenu() {
-  const menu = document.getElementById("menu");
-  menu.style.right = menu.style.right === "0px" ? "-260px" : "0px";
+  const m = document.getElementById("menu");
+  m.style.right = m.style.right === "0px" ? "-260px" : "0px";
 }
 
+// VIEW
 function showLive() {
   document.getElementById("live").style.display = "block";
   document.getElementById("history").style.display = "none";
 }
 
-// ================= HISTORY =================
 function showTemp() {
-  loadHistory(() => renderTable("Temperature History", "temp"));
+  loadHistory(() => render("TEMP HISTORY", "temp"));
 }
 
 function showHum() {
-  loadHistory(() => renderTable("Humidity History", "hum"));
+  loadHistory(() => render("HUM HISTORY", "hum"));
 }
 
-function renderTable(title, type) {
+// TABLE
+function render(title, type) {
   document.getElementById("live").style.display = "none";
   document.getElementById("history").style.display = "block";
 
   document.getElementById("title").innerText = title;
 
-  let html = `
-    <table>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>${type === "temp" ? "Temperature" : "Humidity"}</th>
-        <th>Status</th>
-      </tr>
-  `;
+  let html = `<table>
+    <tr><th>Date</th><th>Time</th><th>Value</th><th>Status</th></tr>`;
 
   history.forEach(h => {
-    html += `
-      <tr>
-        <td>${h.date}</td>
-        <td>${h.time}</td>
-        <td>${h.temp ?? "DISCONNECTED"}</td>
-        <td>${h.status ?? "DISCONNECTED"}</td>
-      </tr>
-    `;
+    html += `<tr>
+      <td>${h.date}</td>
+      <td>${h.time}</td>
+      <td>${type === "temp" ? h.temp : h.hum}</td>
+      <td>${h.status}</td>
+    </tr>`;
   });
 
-  html += `</table>`;
+  html += "</table>";
   document.getElementById("list").innerHTML = html;
 }
 
-// ================= SEARCH =================
+// FILTER
 function filterHistory() {
-  const date = document.getElementById("searchDate").value;
-  const time = document.getElementById("searchTime").value;
+  const d = document.getElementById("searchDate").value;
+  const t = document.getElementById("searchTime").value;
 
-  let filtered = history;
+  let f = history;
+  if (d) f = f.filter(x => x.date === d);
+  if (t) f = f.filter(x => x.time.startsWith(t));
 
-  if (date) filtered = filtered.filter(h => h.date === date);
-  if (time) filtered = filtered.filter(h => h.time.startsWith(time));
-
-  renderFiltered(filtered);
+  renderFiltered(f);
 }
 
 function renderFiltered(data) {
-  let html = `
-    <table>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>Value</th>
-        <th>Status</th>
-      </tr>
-  `;
+  let html = `<table>
+    <tr><th>Date</th><th>Time</th><th>Value</th><th>Status</th></tr>`;
 
   data.forEach(h => {
-    html += `
-      <tr>
-        <td>${h.date}</td>
-        <td>${h.time}</td>
-        <td>${h.temp ?? h.hum ?? "DISCONNECTED"}</td>
-        <td>${h.status ?? "DISCONNECTED"}</td>
-      </tr>
-    `;
+    html += `<tr>
+      <td>${h.date}</td>
+      <td>${h.time}</td>
+      <td>${h.temp || h.hum || "DISCONNECTED"}</td>
+      <td>${h.status}</td>
+    </tr>`;
   });
 
-  html += `</table>`;
+  html += "</table>";
   document.getElementById("list").innerHTML = html;
 }
 
-// ================= RESET =================
+// RESET
 function resetHistory() {
   document.getElementById("searchDate").value = "";
   document.getElementById("searchTime").value = "";
   renderFiltered(history);
 }
 
-// ================= DARK MODE =================
+// DARK
 function toggleDark() {
   document.body.classList.toggle("dark");
 }
