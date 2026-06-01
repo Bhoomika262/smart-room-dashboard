@@ -86,6 +86,16 @@ window.onload = function () {
 //  LIVE DATA LISTENER
 //  Every time this fires = sensor is alive (regardless of values)
 // ============================================================
+// Dedicated ping listener — /room/ping increments every 5s from Arduino
+// so this ALWAYS fires on every send, even when temp/hum are unchanged.
+// This is what keeps lastSensorEventTime fresh.
+db.ref("/room/ping").on("value", function(snap) {
+  if (snap.val() !== null) {
+    lastSensorEventTime = Date.now();
+    updateSensorStatus();
+  }
+});
+
 db.ref("/room").on("value", function(snap) {
   var d = snap.val();
   if (!d) return;
